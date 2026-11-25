@@ -1,5 +1,31 @@
 // Supabase data/auth service. State is injected from the application shell.
 export function createSupabaseService(appState, deps) {
+        const MARKER_SELECT = [
+            'id', 'session_id', 'owner_id', 'client_uuid', 'name',
+            'position_x', 'position_y', 'position_z',
+            'norm_x', 'norm_y', 'norm_z',
+            'achieved_date', 'week_start_date', 'created_at'
+        ].join(',');
+
+        let pollInFlight = false;
+        let markerRenderScheduled = false;
+
+        function scheduleMarkerRender() {
+            if (markerRenderScheduled) return;
+            markerRenderScheduled = true;
+            requestAnimationFrame(() => {
+                markerRenderScheduled = false;
+                deps.rebuildMarkers3D(true);
+            });
+        }
+
+        function stopPollingFallback() {
+            if (appState.pollTimer) {
+                clearInterval(appState.pollTimer);
+                appState.pollTimer = null;
+            }
+            pollInFlight = false;
+        }
         function setCloudStatusUI(state, label) {
             const btn = document.getElementById('cloud-status-btn');
             const dot = document.getElementById('cloud-status-dot');
@@ -123,15 +149,20 @@ export function createSupabaseService(appState, deps) {
 
         function startPollingFallback() {
             if (appState.pollTimer) return;
-            appState.pollTimer = setInterval(() => {
-                if (!document.hidden && navigator.onLine) {
-                    fetchAllMarkersPaginated().then((fetched) => {
-                        appState.markers = fetched;
-                        updateHeaderCounts();
-                        deps.rebuildMarkers3D(true);
-                    }).catch(() => {});
+            appState.pollTimer = setInterval(async () => {
+                if (document.hidden || !navigator.onLine || pollInFlight) return;
+                pollInFlight = true;
+                try {
+                    const fetched = await fetchAllMarkersPaginated();
+                    appState.markers = fetched;
+                    updateHeaderCounts();
+                    scheduleMarkerRender();
+                } catch (err) {
+                    console.warn('Polling fallback Supabase gagal:', err);
+                } finally {
+                    pollInFlight = false;
                 }
-            }, 10000);
+            }, 30000);
         }
 
         function initSupabaseClient() {
@@ -235,7 +266,7 @@ export function createSupabaseService(appState, deps) {
             while (true) {
                 const { data, error } = await appState.supabaseClient
                     .from('climbing_markers')
-                    .select('*')
+                    .select(MARKER_SELECT)
                     .order('created_at', { ascending: false })
                     .order('id', { ascending: false })
                     .range(from, from + pageSize - 1);
@@ -249,7 +280,6 @@ export function createSupabaseService(appState, deps) {
                 }
                 if (data.length < pageSize) break;
                 from += pageSize;
-                if (from >= 5000) break;
             }
             return allRows;
         }
@@ -292,7 +322,7 @@ export function createSupabaseService(appState, deps) {
                 }
 
                 // 3. Pasang realtime (atau fallback polling bila WebSocket sandbox dilarang)
-                setupRealtimeSubscription();
+                await setupRealtimeSubscription();
 
                 if (authWarning) {
                     const diag = diagnoseSupabaseError(authWarning);
@@ -337,7 +367,7 @@ export function createSupabaseService(appState, deps) {
             }
         }
 
-        function setupRealtimeSubscription() {
+        async function setupRealtimeSubscription() {
             if (!appState.supabaseClient) return;
             if (!isRealtimeWebSocketAllowed()) {
                 startPollingFallback();
@@ -346,38 +376,59 @@ export function createSupabaseService(appState, deps) {
 
             try {
                 if (appState.realtimeChannel) {
-                    appState.supabaseClient.removeChannel(appState.realtimeChannel);
+                    await appState.supabaseClient.removeChannel(appState.realtimeChannel);
                     appState.realtimeChannel = null;
                 }
+
+                const markerRealtimeColumns = [
+                    'id', 'session_id', 'owner_id', 'client_uuid', 'name',
+                    'position_x', 'position_y', 'position_z',
+                    'norm_x', 'norm_y', 'norm_z',
+                    'achieved_date', 'week_start_date', 'created_at'
+                ];
+
                 appState.realtimeChannel = appState.supabaseClient
-                    .channel('iyalagi-manjat-appState.markers-live')
+                    .channel('iyalagi-manjat-markers-live')
                     .on(
                         'postgres_changes',
-                        { event: 'INSERT', schema: 'public', table: 'climbing_markers' },
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'climbing_markers',
+                            select: markerRealtimeColumns
+                        },
                         (payload) => {
                             const mapped = mapMarkerRow(payload.new);
                             if (mapped) {
                                 upsertLocalMarker(mapped);
                                 updateHeaderCounts();
-                                deps.rebuildMarkers3D(true);
+                                scheduleMarkerRender();
                             }
                         }
                     )
                     .on(
                         'postgres_changes',
-                        { event: 'DELETE', schema: 'public', table: 'climbing_markers' },
+                        {
+                            event: 'DELETE',
+                            schema: 'public',
+                            table: 'climbing_markers',
+                            select: ['id']
+                        },
                         (payload) => {
-                            const oldId = payload.old && payload.old.id ? String(payload.old.id) : null;                            if (!oldId) return;
+                            const oldId = payload.old && payload.old.id ? String(payload.old.id) : null;
+                            if (!oldId) return;
                             appState.markers = appState.markers.filter((m) => m.id !== oldId);
                             if (appState.selectedMarker && appState.selectedMarker.id === oldId) {
                                 deps.closeMarkerPopup();
                             }
                             updateHeaderCounts();
-                            deps.rebuildMarkers3D(true);
+                            scheduleMarkerRender();
                         }
                     )
                     .subscribe((status) => {
-                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        if (status === 'SUBSCRIBED') {
+                            stopPollingFallback();
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                             startPollingFallback();
                         }
                     });
