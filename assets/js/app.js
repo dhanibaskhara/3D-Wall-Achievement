@@ -1,6 +1,7 @@
 import { generateUuidV4, mulberry32, formatDateIndo } from './utils.js';
 import { createSupabaseService } from './supabase.js';
 import { createCameraControls } from './camera-controls.js';
+import { createMarkerRenderer } from './markers.js';
 
 /* 3D Wall Achievement — application entry point. Keep app logic in this IIFE until safely split into modules. */
 (function () {
@@ -98,6 +99,21 @@ import { createCameraControls } from './camera-controls.js';
 
         let sharedPawAssets = null;
 
+        const markerState = {};
+        Object.defineProperties(markerState, {
+            pinsGroup: { get: () => pinsGroup, set: (value) => { pinsGroup = value; } },
+            previewGroup: { get: () => previewGroup, set: (value) => { previewGroup = value; } },
+            markers: { get: () => markers, set: (value) => { markers = value; } },
+            renderedPawEntries: { get: () => renderedPawEntries, set: (value) => { renderedPawEntries = value; } },
+            hitTargets: { get: () => hitTargets, set: (value) => { hitTargets = value; } },
+            lastClusterDistBucket: { get: () => lastClusterDistBucket, set: (value) => { lastClusterDistBucket = value; } },
+            activeWeekStartDate: { get: () => activeWeekStartDate, set: (value) => { activeWeekStartDate = value; } },
+            sharedPawAssets: { get: () => sharedPawAssets, set: (value) => { sharedPawAssets = value; } }
+        });
+        const markerService = createMarkerRenderer(markerState, {
+            get THREE() { return window.THREE; }, snapPointToWallSurface
+        });
+
         const supabaseState = {};
         Object.defineProperties(supabaseState, {
             supabaseClient: { get: () => supabaseClient, set: (value) => { supabaseClient = value; } },
@@ -109,7 +125,7 @@ import { createCameraControls } from './camera-controls.js';
             selectedMarker: { get: () => selectedMarker, set: (value) => { selectedMarker = value; } },
             lastCloudDiag: { get: () => lastCloudDiag, set: (value) => { lastCloudDiag = value; } }
         });
-        const supabaseService = createSupabaseService(supabaseState, { SUPABASE_URL, SUPABASE_KEY, createResilientStorage, formatDateIndo, generateUuidV4, showToast, rebuildMarkers3D, closeMarkerPopup });
+        const supabaseService = createSupabaseService(supabaseState, { SUPABASE_URL, SUPABASE_KEY, createResilientStorage, formatDateIndo, generateUuidV4, showToast, markerService.rebuildMarkers3D, closeMarkerPopup });
         const cameraState = {};
         Object.defineProperties(cameraState, {
             camera: { get: () => camera, set: (value) => { camera = value; } },
@@ -2019,419 +2035,6 @@ import { createCameraControls } from './camera-controls.js';
         // =========================================================================
         // 7. VISUALISASI 3D GLOWING CAT PAW + LABEL NAMA & CLUSTERING
         // =========================================================================
-        function initSharedPawAssets() {
-            if (sharedPawAssets) return sharedPawAssets;
-
-            const c = document.createElement('canvas');
-            c.width = 128;
-            c.height = 128;
-            const ctx = c.getContext('2d');
-            const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
-            g.addColorStop(0, 'rgba(255,255,255,1)');
-            g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
-            g.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, 128, 128);
-            const glowTex = new THREE.CanvasTexture(c);
-
-            const makeMatSet = (padHex, rimHex, glowHex, opacity) => ({
-                pad: new THREE.MeshBasicMaterial({ color: padHex, transparent: opacity < 1, opacity }),
-                rim: new THREE.MeshBasicMaterial({ color: rimHex, transparent: opacity < 1, opacity }),
-                back: new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.78 * opacity }),
-                glow: new THREE.SpriteMaterial({
-                    map: glowTex,
-                    color: glowHex,
-                    transparent: true,
-                    opacity: 0.72 * opacity,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false
-                })
-            });
-
-            // Ukuran ringkas & presisi agar dinding sanggup menampung banyak paw
-            sharedPawAssets = {
-                backDiscGeo: new THREE.CircleGeometry(0.115, 20),
-                rimGeo: new THREE.TorusGeometry(0.115, 0.012, 8, 20),
-                mainPadGeo: new THREE.SphereGeometry(0.044, 10, 8),
-                toeGeo: new THREE.SphereGeometry(0.021, 8, 6),
-                hitGeo: new THREE.SphereGeometry(0.20, 8, 8),
-                hitMat: new THREE.MeshBasicMaterial({ visible: false }),
-                anchorDotGeo: new THREE.SphereGeometry(0.028, 8, 8),
-                anchorDotMat: new THREE.MeshBasicMaterial({ color: 0xfef3c7 }),
-                spiderLineMat: new THREE.LineBasicMaterial({ color: 0xfdba74, transparent: true, opacity: 0.8 }),
-                styles: {
-                    active:  makeMatSet(0xff922b, 0xffedd5, 0xf97316, 1.0),
-                    archive: makeMatSet(0xd6b588, 0xcbd5e1, 0x94a3b8, 0.72),
-                    preview: makeMatSet(0x34d399, 0xd1fae5, 0x10b981, 1.0)
-                }
-            };
-            return sharedPawAssets;
-        }
-
-        function createNameLabelSprite(nameText, styleKey) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const clean = (nameText || 'Kamu').trim().slice(0, 32) || 'Kamu';
-            const fontSize = 28;
-            ctx.font = `800 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-            const textW = ctx.measureText(clean).width;
-            const padX = 22;
-            const w = Math.min(512, Math.max(110, Math.ceil(textW + padX * 2)));
-            const h = 48;
-            canvas.width = w;
-            canvas.height = h;
-
-            const radius = 22;
-            ctx.beginPath();
-            ctx.moveTo(radius, 2);
-            ctx.lineTo(w - radius, 2);
-            ctx.quadraticCurveTo(w - 2, 2, w - 2, radius);
-            ctx.lineTo(w - 2, h - radius);
-            ctx.quadraticCurveTo(w - 2, h - 2, w - radius, h - 2);
-            ctx.lineTo(radius, h - 2);
-            ctx.quadraticCurveTo(2, h - 2, 2, h - radius);
-            ctx.lineTo(2, radius);
-            ctx.quadraticCurveTo(2, 2, radius, 2);
-            ctx.closePath();
-
-            ctx.fillStyle = styleKey === 'preview'
-                ? 'rgba(6, 78, 59, 0.92)'
-                : (styleKey === 'archive' ? 'rgba(30, 41, 59, 0.80)' : 'rgba(15, 23, 42, 0.90)');
-            ctx.fill();
-
-            ctx.lineWidth = 2.5;
-            ctx.strokeStyle = styleKey === 'preview'
-                ? '#34d399'
-                : (styleKey === 'archive' ? 'rgba(203, 213, 225, 0.55)' : '#fb923c');
-            ctx.stroke();
-
-            ctx.font = `800 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-            ctx.fillStyle = styleKey === 'archive' ? '#e2e8f0' : '#ffffff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(clean, w / 2, h / 2 + 1, w - 18);
-
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.encoding = THREE.sRGBEncoding;
-            const mat = new THREE.SpriteMaterial({
-                map: tex,
-                transparent: true,
-                depthTest: false
-            });
-            const sprite = new THREE.Sprite(mat);
-            const aspect = w / h;
-            sprite.scale.set(0.165 * aspect, 0.165, 1);
-            sprite.position.set(0, 0.21, 0.02);
-            sprite.renderOrder = 20;
-            sprite.userData._ownedTexture = tex;
-            sprite.userData._ownedMaterial = mat;
-            return sprite;
-        }
-
-        // Cat paw menempel sangat rapat ke permukaan dinding tanpa mengambang
-        function createCatPaw3D(nameText, styleKey = 'active') {
-            const assets = initSharedPawAssets();
-            const st = assets.styles[styleKey] || assets.styles.active;            const root = new THREE.Group();
-
-            const glow = new THREE.Sprite(st.glow);
-            glow.scale.set(0.46, 0.46, 1);
-            glow.position.z = 0.003;
-            root.add(glow);
-
-            const backDisc = new THREE.Mesh(assets.backDiscGeo, st.back);
-            backDisc.position.z = 0.005;
-            root.add(backDisc);
-
-            const rim = new THREE.Mesh(assets.rimGeo, st.rim);
-            rim.position.z = 0.007;
-            root.add(rim);
-
-            const mainPad = new THREE.Mesh(assets.mainPadGeo, st.pad);
-            mainPad.scale.set(1.15, 0.92, 0.32);
-            mainPad.position.set(0, -0.024, 0.010);
-            root.add(mainPad);
-
-            const toes = [
-                [-0.052,  0.022],
-                [-0.021,  0.052],
-                [ 0.021,  0.052],
-                [ 0.052,  0.022]
-            ];
-            toes.forEach(([tx, ty]) => {
-                const toe = new THREE.Mesh(assets.toeGeo, st.pad);
-                toe.scale.set(0.92, 1.12, 0.35);
-                toe.position.set(tx, ty, 0.011);
-                root.add(toe);
-            });
-
-            const labelSprite = createNameLabelSprite(nameText, styleKey);
-            root.add(labelSprite);
-
-            return { root, glow, labelSprite };
-        }
-
-        function createClusterBadge3D(count) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 160;
-            canvas.height = 160;
-            const ctx = canvas.getContext('2d');
-
-            const g = ctx.createRadialGradient(80, 80, 12, 80, 80, 78);
-            g.addColorStop(0, 'rgba(249, 115, 22, 0.95)');
-            g.addColorStop(0.58, 'rgba(234, 88, 12, 0.88)');
-            g.addColorStop(1, 'rgba(249, 115, 22, 0)');
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(80, 80, 76, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(80, 80, 44, 0, Math.PI * 2);
-            ctx.fillStyle = '#0f172a';
-            ctx.fill();
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = '#fb923c';
-            ctx.stroke();
-
-            ctx.font = '800 34px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`🐾${count}`, 80, 82);
-
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.encoding = THREE.sRGBEncoding;
-            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-            const sprite = new THREE.Sprite(mat);
-            sprite.scale.set(0.65, 0.65, 1);
-            sprite.renderOrder = 25;
-            sprite.userData._ownedTexture = tex;
-            sprite.userData._ownedMaterial = mat;
-            return sprite;
-        }
-
-        function disposeOwnedSprites(group) {
-            group.traverse((obj) => {
-                if (obj.userData) {
-                    if (obj.userData._ownedGeometry) {
-                        obj.userData._ownedGeometry.dispose();
-                    }
-                    if (obj.userData._ownedTexture) {
-                        obj.userData._ownedTexture.dispose();
-                    }
-                    if (obj.userData._ownedMaterial) {
-                        obj.userData._ownedMaterial.dispose();
-                    }
-                }
-            });
-            while (group.children.length > 0) {
-                group.remove(group.children[0]);
-            }
-        }
-
-        function computeClusters(list, radius) {
-            if (radius <= 0.05 || list.length <= 1) {
-                return list.map((m) => {
-                    const sn = snapPointToWallSurface(m.position_x, m.position_y);
-                    return {
-                        isCluster: false,
-                        markers: [m],
-                        pos: sn.pos,
-                        normal: sn.normal
-                    };
-                });
-            }
-            const used = new Array(list.length).fill(false);
-            const out = [];
-            const r2 = radius * radius;
-
-            for (let i = 0; i < list.length; i++) {
-                if (used[i]) continue;
-                used[i] = true;
-                const base = list[i];
-                const clusterItems = [base];
-                let sx = base.position_x, sy = base.position_y;
-
-                for (let j = i + 1; j < list.length; j++) {
-                    if (used[j]) continue;
-                    const o = list[j];
-                    const dx = o.position_x - base.position_x;
-                    const dy = o.position_y - base.position_y;
-                    if (dx * dx + dy * dy <= r2) {
-                        used[j] = true;
-                        clusterItems.push(o);
-                        sx += o.position_x;
-                        sy += o.position_y;
-                    }
-                }
-                const n = clusterItems.length;
-                const avgX = sx / n;
-                const avgY = sy / n;
-                const sn = snapPointToWallSurface(avgX, avgY);
-                out.push({
-                    isCluster: n > 1,
-                    markers: clusterItems,
-                    pos: sn.pos,
-                    normal: sn.normal
-                });
-            }
-            return out;
-        }
-
-        function getClusterRadiusForCamera() {
-            if (!camSpherical) return 0;
-            const d = camSpherical.radius;
-            if (d > 24) return 0.72;
-            if (d > 16) return 0.42;
-            if (d > 10.5) return 0.22;
-            return 0;
-        }
-
-        function rebuildMarkers3D(force = false) {
-            if (!pinsGroup) return;
-            const radius = getClusterRadiusForCamera();
-            const bucket = Math.round(radius * 10);
-            if (!force && bucket === lastClusterDistBucket) return;
-            lastClusterDistBucket = bucket;
-
-            disposeOwnedSprites(pinsGroup);
-            renderedPawEntries = [];
-            hitTargets = [];
-
-            const assets = initSharedPawAssets();
-            const zAxis = new THREE.Vector3(0, 0, 1);
-            const worldUp = new THREE.Vector3(0, 1, 0);
-
-            // Jarak tumpuk spiderfy dirapatkan agar rapi & presisi
-            const OVERLAP_SPIDERFY_RADIUS = 0.32;
-            const MAX_SPIDERFY_COUNT = 10;
-            const isCloseZoom = radius === 0;
-            const groupingRadius = isCloseZoom ? OVERLAP_SPIDERFY_RADIUS : radius;
-            const clusters = computeClusters(markers, groupingRadius);
-
-            const placeSinglePaw = (m, worldPos, norm) => {
-                const isCurrentWeek = !activeWeekStartDate || !m.week_start_date || m.week_start_date === activeWeekStartDate;
-                const styleKey = isCurrentWeek ? 'active' : 'archive';
-                const pawObj = createCatPaw3D(m.name, styleKey);
-
-                pawObj.root.position.copy(worldPos);
-                pawObj.root.quaternion.setFromUnitVectors(zAxis, norm);
-                pinsGroup.add(pawObj.root);
-
-                renderedPawEntries.push({
-                    glow: pawObj.glow,
-                    baseScale: isCurrentWeek ? 0.46 : 0.36,
-                    phase: Math.random() * Math.PI * 2
-                });
-
-                const hit = new THREE.Mesh(assets.hitGeo, assets.hitMat);
-                hit.position.copy(worldPos);
-                hit.userData = { type: 'marker', marker: m };
-                pinsGroup.add(hit);
-                hitTargets.push(hit);
-            };
-
-            clusters.forEach((c) => {
-                const norm = c.normal.lengthSq() > 0.01 ? c.normal.clone().normalize() : zAxis.clone();
-
-                // 1. Marker tunggal: menempel sangat rapat ke permukaan dinding (offset normal hanya 1,2 cm)
-                if (!c.isCluster) {
-                    const m = c.markers[0];
-                    const pos = c.pos.clone().addScaledVector(norm, 0.012);
-                    placeSinglePaw(m, pos, norm);
-                    return;
-                }
-
-                // 2. Zoom dekat & 2–10 paw bertumpuk di titik sama -> Auto-Spiderfy (mekar sejajar dinding)
-                if (isCloseZoom && c.markers.length <= MAX_SPIDERFY_COUNT) {
-                    const sorted = [...c.markers].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-                    const n = sorted.length;
-                    const anchorPos = c.pos.clone().addScaledVector(norm, 0.012);
-
-                    const anchorDot = new THREE.Mesh(assets.anchorDotGeo, assets.anchorDotMat);
-                    anchorDot.position.copy(anchorPos);
-                    pinsGroup.add(anchorDot);
-
-                    let wallRight = new THREE.Vector3().crossVectors(worldUp, norm);
-                    if (wallRight.lengthSq() < 0.001) {
-                        wallRight.set(1, 0, 0);
-                    } else {
-                        wallRight.normalize();
-                    }
-                    const wallUp = new THREE.Vector3().crossVectors(norm, wallRight).normalize();
-
-                    const rx = n === 2 ? 0.22 : Math.min(0.55, 0.22 + n * 0.038);
-                    const ry = n === 2 ? 0.00 : Math.min(0.44, 0.17 + n * 0.030);
-                    const startAngle = n === 2 ? 0 : Math.PI / 2;
-
-                    sorted.forEach((m, idx) => {
-                        const angle = startAngle + (idx / n) * Math.PI * 2;
-                        const spiderOffset = anchorPos.clone()
-                            .addScaledVector(wallRight, Math.cos(angle) * rx)
-                            .addScaledVector(wallUp, Math.sin(angle) * ry);
-                        const sn = snapPointToWallSurface(spiderOffset.x, spiderOffset.y);
-                        const spiderPos = sn.pos.clone().addScaledVector(sn.normal, 0.012);
-
-                        const lineGeo = new THREE.BufferGeometry().setFromPoints([anchorPos, spiderPos]);
-                        const line = new THREE.Line(lineGeo, assets.spiderLineMat);
-                        line.userData._ownedGeometry = lineGeo;
-                        pinsGroup.add(line);
-
-                        placeSinglePaw(m, spiderPos, sn.normal);
-                    });
-                    return;
-                }
-
-                // 3. Zoom jauh/sedang ATAU >10 paw di satu titik -> Cluster Badge rapat
-                const badge = createClusterBadge3D(c.markers.length);
-                badge.position.copy(c.pos).addScaledVector(norm, 0.045);
-                pinsGroup.add(badge);
-
-                const hit = new THREE.Mesh(assets.hitGeo, assets.hitMat);
-                hit.position.copy(badge.position);
-                hit.scale.setScalar(1.25);
-                hit.userData = {
-                    type: 'cluster',
-                    targetPos: c.pos.clone(),
-                    count: c.markers.length,
-                    markers: c.markers,
-                    isDenseCluster: isCloseZoom
-                };
-                pinsGroup.add(hit);
-                hitTargets.push(hit);
-            });
-        }
-
-        function setPreviewMarker3D(position, normal, labelName = 'Kamu') {
-            if (!previewGroup) return;
-            disposeOwnedSprites(previewGroup);
-            if (!position || !normal) return;
-
-            const zAxis = new THREE.Vector3(0, 0, 1);
-            const pawObj = createCatPaw3D(labelName || 'Kamu', 'preview');
-            const sn = snapPointToWallSurface(position.x, position.y);
-            pawObj.root.position.copy(sn.pos).addScaledVector(sn.normal, 0.012);
-            pawObj.root.quaternion.setFromUnitVectors(zAxis, sn.normal);
-            previewGroup.add(pawObj.root);
-            previewGroup.userData.previewGlow = pawObj.glow;
-            previewGroup.userData.previewRoot = pawObj.root;
-            previewGroup.userData.previewLabel = pawObj.labelSprite;
-        }
-
-        function updatePreviewLabelName(text) {
-            if (!previewGroup || !previewGroup.userData.previewRoot) return;
-            const root = previewGroup.userData.previewRoot;
-            const oldLabel = previewGroup.userData.previewLabel;
-            if (oldLabel) {
-                if (oldLabel.userData._ownedTexture) oldLabel.userData._ownedTexture.dispose();
-                if (oldLabel.userData._ownedMaterial) oldLabel.userData._ownedMaterial.dispose();
-                root.remove(oldLabel);
-            }
-            const newLabel = createNameLabelSprite(text || 'Kamu', 'preview');
-            root.add(newLabel);
-            previewGroup.userData.previewLabel = newLabel;
-        }
-
         // =========================================================================
         // 8. KONTROL KAMERA (ORBIT + PANNING 4 ARAH MOUSE & TOUCH) & INTERAKSI TAP
         // =========================================================================
@@ -2450,7 +2053,7 @@ import { createCameraControls } from './camera-controls.js';
                     pendingPlacement = { position: sn.pos, normal: sn.normal };
                     const nameInput = document.getElementById('input-climber-name');
                     const curName = nameInput ? nameInput.value.trim() : '';
-                    setPreviewMarker3D(pendingPlacement.position, pendingPlacement.normal, curName || 'Kamu');
+                    markerService.setPreviewMarker3D(pendingPlacement.position, pendingPlacement.normal, curName || 'Kamu');
                     openConfirmSheet(pendingPlacement.position.y);
                 } else {
                     showToast('Ketuk langsung pada permukaan dinding abu-abu atau biru.');
@@ -2496,7 +2099,7 @@ import { createCameraControls } from './camera-controls.js';
         function exitAddMode() {
             isAddMode = false;
             pendingPlacement = null;
-            setPreviewMarker3D(null, null);
+            markerService.setPreviewMarker3D(null, null);
             const banner = document.getElementById('add-mode-banner');
             if (banner) banner.classList.add('hidden');
             const addBtn = document.getElementById('add-achievement-btn');
@@ -2649,7 +2252,7 @@ import { createCameraControls } from './camera-controls.js';
                 const val = e.target.value;
                 const countEl = document.getElementById('name-char-count');
                 if (countEl) countEl.textContent = `${val.length}/32`;
-                updatePreviewLabelName(val.trim() || 'Kamu');
+                markerService.updatePreviewLabelName(val.trim() || 'Kamu');
             });
 
             on('confirm-form', 'submit', async (e) => {
@@ -2741,7 +2344,7 @@ import { createCameraControls } from './camera-controls.js';
             camera.position.copy(camTarget).add(offset);
             camera.lookAt(camTarget);
 
-            rebuildMarkers3D(false);
+            markerService.rebuildMarkers3D(false);
 
             const t = (time || 0) * 0.0028;
             for (let i = 0; i < renderedPawEntries.length; i++) {
