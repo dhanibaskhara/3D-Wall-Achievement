@@ -1,3 +1,5 @@
+import { mulberry32 } from './utils.js';
+
 // 3D wall geometry, climbing holds, environment and living community scene.
 export function createScene3D(appState, deps) {
         function getWallSurfaceAtY(profile, y) {
