@@ -1,3 +1,7 @@
+import { generateUuidV4, mulberry32, formatDateIndo } from './utils.js';
+import { createSupabaseService } from './supabase.js';
+import { createCameraControls } from './camera-controls.js';
+
 /* 3D Wall Achievement — application entry point. Keep app logic in this IIFE until safely split into modules. */
 (function () {
         'use strict';
@@ -94,6 +98,36 @@
 
         let sharedPawAssets = null;
 
+        const supabaseState = {};
+        Object.defineProperties(supabaseState, {
+            supabaseClient: { get: () => supabaseClient, set: (value) => { supabaseClient = value; } },
+            realtimeChannel: { get: () => realtimeChannel, set: (value) => { realtimeChannel = value; } },
+            pollTimer: { get: () => pollTimer, set: (value) => { pollTimer = value; } },
+            currentUserId: { get: () => currentUserId, set: (value) => { currentUserId = value; } },
+            activeWeekStartDate: { get: () => activeWeekStartDate, set: (value) => { activeWeekStartDate = value; } },
+            markers: { get: () => markers, set: (value) => { markers = value; } },
+            selectedMarker: { get: () => selectedMarker, set: (value) => { selectedMarker = value; } },
+            lastCloudDiag: { get: () => lastCloudDiag, set: (value) => { lastCloudDiag = value; } }
+        });
+        const supabaseService = createSupabaseService(supabaseState, { SUPABASE_URL, SUPABASE_KEY, createResilientStorage, formatDateIndo, generateUuidV4, showToast, rebuildMarkers3D, closeMarkerPopup });
+        const cameraState = {};
+        Object.defineProperties(cameraState, {
+            camera: { get: () => camera, set: (value) => { camera = value; } },
+            renderer: { get: () => renderer, set: (value) => { renderer = value; } },
+            camSpherical: { get: () => camSpherical, set: (value) => { camSpherical = value; } },
+            targetSpherical: { get: () => targetSpherical, set: (value) => { targetSpherical = value; } },
+            targetLookAt: { get: () => targetLookAt, set: (value) => { targetLookAt = value; } },
+            isDragging: { get: () => isDragging, set: (value) => { isDragging = value; } },
+            isPinching: { get: () => isPinching, set: (value) => { isPinching = value; } },
+            pointerDownPos: { get: () => pointerDownPos, set: (value) => { pointerDownPos = value; } },
+            lastPointerPos: { get: () => lastPointerPos, set: (value) => { lastPointerPos = value; } },
+            lastPinchDist: { get: () => lastPinchDist, set: (value) => { lastPinchDist = value; } },
+            activePointers: { get: () => activePointers, set: (value) => { activePointers = value; } },
+            isPanMode: { get: () => isPanMode, set: (value) => { isPanMode = value; } },
+            hadMultiTouch: { get: () => hadMultiTouch, set: (value) => { hadMultiTouch = value; } }
+        });
+        const cameraControls = createCameraControls(cameraState, { get THREE() { return window.THREE; }, handleCanvasTap });
+
         // =========================================================================
         // 3. HELPER UMUM (SCRIPT LOADER, STORAGE ADAPTER, UUID, TANGGAL, SEEDED RNG)
         // =========================================================================
@@ -157,44 +191,6 @@
             };
         }
 
-        function generateUuidV4() {
-            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-                return window.crypto.randomUUID();
-            }
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-                const r = (Math.random() * 16) | 0;
-                const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-                return v.toString(16);
-            });
-        }
-
-        function mulberry32(seed) {
-            let a = seed >>> 0;
-            return function () {
-                a |= 0;
-                a = (a + 0x6d2b79f5) | 0;
-                let t = Math.imul(a ^ (a >>> 15), 1 | a);
-                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-            };
-        }
-
-        function formatDateIndo(dateStr) {
-            if (!dateStr) return '-';
-            try {
-                const parts = String(dateStr).slice(0, 10).split('-');
-                if (parts.length !== 3) return dateStr;
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                const d = parseInt(parts[2], 10);
-                const m = parseInt(parts[1], 10) - 1;
-                const y = parts[0];
-                if (isNaN(d) || isNaN(m) || !months[m]) return dateStr;
-                return `${d} ${months[m]} ${y}`;
-            } catch (_) {
-                return dateStr;
-            }
-        }
-
         function getWallSurfaceAtY(profile, y) {
             const clampedY = Math.max(profile[0][0], Math.min(profile[profile.length - 1][0], y));
             for (let i = 0; i < profile.length - 1; i++) {
@@ -255,491 +251,6 @@
         // =========================================================================
         // 4. STATUS KONEKSI & DIAGNOSTIK SUPABASE
         // =========================================================================
-        function setCloudStatusUI(state, label) {
-            const btn = document.getElementById('cloud-status-btn');
-            const dot = document.getElementById('cloud-status-dot');
-            const txt = document.getElementById('cloud-status-text');
-            if (!btn || !dot || !txt) return;
-
-            txt.textContent = label;
-            if (state === 'live') {
-                btn.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/30 transition cursor-pointer';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]';
-            } else if (state === 'connecting') {
-                btn.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-200 border border-sky-400/30 transition cursor-pointer';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse';
-            } else {
-                btn.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-200 border border-amber-400/40 hover:bg-amber-500/30 transition cursor-pointer';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
-            }
-        }
-
-        function diagnoseSupabaseError(err) {
-            const code = err && err.code ? String(err.code) : '';
-            const status = err && err.status ? String(err.status) : '';
-            const msg = err && err.message ? String(err.message) : String(err || 'Unknown error');
-            const details = err && err.details ? ` (${err.details})` : '';
-            const raw = `${code ? `[${code}] ` : ''}${status ? `(HTTP ${status}) ` : ''}${msg}${details}`;
-            const lower = raw.toLowerCase();
-
-            if (lower.includes('anonymous_provider_disabled') || lower.includes('anonymous sign-ins are disabled')) {
-                return {
-                    badge: 'Aktifkan Anon Auth',
-                    isAnonDisabled: true,
-                    raw,
-                    hint: 'Anonymous Sign-Ins belum diaktifkan di project Supabase Anda.'
-                };
-            }
-            if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('load failed')) {
-                return {
-                    badge: 'Offline / Jaringan',
-                    isAnonDisabled: false,
-                    raw,
-                    hint: 'Koneksi ke server Supabase terhambat atau sedang offline. Coba periksa internet lalu tekan Coba Hubungkan Ulang.'
-                };
-            }
-            if (lower.includes('pgrst202') || lower.includes('could not find the function')) {
-                return {
-                    badge: 'Cek RPC Supabase',
-                    isAnonDisabled: false,
-                    raw,
-                    hint: 'Fungsi RPC tidak ditemukan atau signature parameter berbeda dengan database Supabase.'
-                };
-            }
-            if (lower.includes('42501') || lower.includes('permission denied') || lower.includes('row-level security')) {
-                return {
-                    badge: 'Cek RLS / Auth',
-                    isAnonDisabled: false,
-                    raw,
-                    hint: 'Hak akses ditolak oleh kebijakan RLS / autentikasi database.'
-                };
-            }
-            return {
-                badge: 'Gangguan Sync',
-                isAnonDisabled: false,
-                raw,
-                hint: 'Periksa koneksi internet dan konfigurasi Supabase Anda.'
-            };
-        }
-
-        function updateDiagModalUI() {
-            const statusEl = document.getElementById('diag-status-label');
-            const detailBox = document.getElementById('diag-detail-box');
-            const rawEl = document.getElementById('diag-error-raw');
-            const hintEl = document.getElementById('diag-error-hint');
-            const anonStepsEl = document.getElementById('diag-anon-steps');
-            if (!statusEl || !detailBox || !rawEl || !hintEl) return;
-
-            statusEl.textContent = lastCloudDiag.label;
-            if (lastCloudDiag.state === 'live') {
-                detailBox.className = 'rounded-xl bg-emerald-50 border border-emerald-200 p-3 space-y-1.5';
-                const uidShort = currentUserId ? `${currentUserId.slice(0, 8)}...` : 'Anonymous';
-                rawEl.textContent = `Terhubung ke ${SUPABASE_URL} · Auth UID: ${uidShort}`;
-                hintEl.textContent = 'Marker Cat Paw langsung tersimpan ke database Supabase dan muncul real-time untuk seluruh anggota komunitas.';
-                if (anonStepsEl) anonStepsEl.classList.add('hidden');
-            } else {
-                detailBox.className = 'rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5';
-                rawEl.textContent = lastCloudDiag.raw || 'Menunggu koneksi ke Supabase...';
-                hintEl.textContent = lastCloudDiag.hint || 'Pastikan internet aktif dan Anonymous Sign-Ins sudah menyala.';
-                if (anonStepsEl) {
-                    if (lastCloudDiag.isAnonDisabled) anonStepsEl.classList.remove('hidden');
-                    else anonStepsEl.classList.add('hidden');
-                }
-            }
-        }
-
-        function openCloudDiagModal() {
-            updateDiagModalUI();
-            const m = document.getElementById('cloud-diag-modal');
-            if (m) m.classList.remove('hidden');
-        }
-
-        function closeCloudDiagModal() {
-            const m = document.getElementById('cloud-diag-modal');
-            if (m) m.classList.add('hidden');
-        }
-
-        // =========================================================================
-        // 5. INTEGRASI SUPABASE (ANON AUTH, WEEKLY SESSION, MARKER RPC, REALTIME)
-        // =========================================================================
-        function isRealtimeWebSocketAllowed() {
-            try {
-                const proto = window.location.protocol || '';
-                const host = window.location.hostname || '';
-                // Canvas preview / Google Web sandbox / blob memblokir WebSocket outbound
-                if (proto === 'blob:' || proto === 'about:' || proto === 'data:' || host.includes('usercontent.goog')) {
-                    return false;
-                }
-                return typeof window.WebSocket === 'function';
-            } catch (_) {
-                return false;
-            }
-        }
-
-        function startPollingFallback() {
-            if (pollTimer) return;
-            pollTimer = setInterval(() => {
-                if (!document.hidden && navigator.onLine) {
-                    fetchAllMarkersPaginated().then((fetched) => {
-                        markers = fetched;
-                        updateHeaderCounts();
-                        rebuildMarkers3D(true);
-                    }).catch(() => {});
-                }
-            }, 10000);
-        }
-
-        function initSupabaseClient() {
-            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
-                return false;
-            }
-            if (!supabaseClient) {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        storage: createResilientStorage(),
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: false,
-                        // Bypass navigator.locks agar tidak macet di sandbox iframe
-                        lock: async function (_name, _acquireTimeout, fn) {
-                            return await fn();
-                        }
-                    }
-                });
-            }
-            return true;
-        }
-
-        async function ensureAnonymousSession() {
-            if (!supabaseClient) {
-                return { ok: false, error: new Error('Supabase SDK belum dimuat.') };
-            }
-            try {
-                const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
-                if (!sessionErr && sessionData && sessionData.session && sessionData.session.user) {
-                    currentUserId = sessionData.session.user.id;
-                    return { ok: true, user: sessionData.session.user };
-                }
-                const { data: anonData, error: anonErr } = await supabaseClient.auth.signInAnonymously();
-                if (anonErr) {
-                    return { ok: false, error: anonErr };
-                }
-                if (anonData && anonData.user) {
-                    currentUserId = anonData.user.id;
-                    return { ok: true, user: anonData.user };
-                }
-                return { ok: false, error: new Error('Sesi Anonymous Auth tidak mengembalikan user.') };
-            } catch (err) {
-                return { ok: false, error: err };
-            }
-        }
-
-        function mapMarkerRow(row) {
-            if (!row) return null;
-            const px = Number(row.position_x ?? row.pos_x ?? 0);
-            const py = Number(row.position_y ?? row.pos_y ?? 0);
-            const pz = Number(row.position_z ?? row.pos_z ?? 0);
-            const nx = Number(row.norm_x ?? 0);
-            const ny = Number(row.norm_y ?? 0);
-            const nz = Number(row.norm_z ?? 1);
-            return {
-                id: String(row.id),
-                session_id: row.session_id || null,
-                owner_id: row.owner_id || null,
-                client_uuid: row.client_uuid || null,
-                name: String(row.name ?? row.climber_name ?? 'Climber'),
-                position_x: Number.isFinite(px) ? px : 0,
-                position_y: Number.isFinite(py) ? py : 1,
-                position_z: Number.isFinite(pz) ? pz : 0.3,
-                norm_x: Number.isFinite(nx) ? nx : 0,
-                norm_y: Number.isFinite(ny) ? ny : 0,
-                norm_z: Number.isFinite(nz) ? nz : 1,
-                achieved_date: row.achieved_date || '',
-                week_start_date: row.week_start_date || null,
-                created_at: row.created_at || null
-            };
-        }
-
-        function upsertLocalMarker(mapped) {
-            if (!mapped || !mapped.id) return false;
-            const idx = markers.findIndex((m) =>
-                m.id === mapped.id || (mapped.client_uuid && m.client_uuid === mapped.client_uuid)
-            );
-            if (idx >= 0) {
-                markers[idx] = mapped;
-            } else {
-                markers.unshift(mapped);
-            }
-            return true;
-        }
-
-        function updateHeaderCounts() {
-            const cntEl = document.getElementById('marker-count-label');
-            if (cntEl) cntEl.textContent = `${markers.length} paw`;
-            const wkEl = document.getElementById('week-badge-label');
-            if (wkEl && activeWeekStartDate) {
-                wkEl.textContent = ` · ${formatDateIndo(activeWeekStartDate)}`;
-            }
-        }
-
-        async function fetchAllMarkersPaginated() {
-            const pageSize = 500;
-            let from = 0;
-            const allRows = [];
-
-            while (true) {
-                const { data, error } = await supabaseClient
-                    .from('climbing_markers')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .order('id', { ascending: false })
-                    .range(from, from + pageSize - 1);
-
-                if (error) throw error;
-                if (!data || data.length === 0) break;
-
-                for (const row of data) {
-                    const mapped = mapMarkerRow(row);
-                    if (mapped) allRows.push(mapped);
-                }
-                if (data.length < pageSize) break;
-                from += pageSize;
-                if (from >= 5000) break;
-            }
-            return allRows;
-        }
-
-        async function syncFromSupabase(showFeedback = false) {
-            setCloudStatusUI('connecting', 'Menghubungkan...');
-            if (!initSupabaseClient()) {
-                lastCloudDiag = {
-                    state: 'offline',
-                    label: 'SDK Gagal Dimuat',
-                    isAnonDisabled: false,
-                    raw: 'Supabase JS SDK gagal dimuat dari CDN.',
-                    hint: 'Periksa koneksi internet Anda lalu muat ulang halaman.'
-                };
-                setCloudStatusUI('offline', 'SDK Offline');
-                updateDiagModalUI();
-                return false;
-            }
-
-            try {
-                // 1. Ambil data komunitas terlebih dahulu (public read)
-                const fetched = await fetchAllMarkersPaginated();
-                markers = fetched;
-                updateHeaderCounts();
-                rebuildMarkers3D(true);
-
-                // 2. Pastikan sesi Anonymous Auth untuk hak simpan/hapus marker
-                const authRes = await ensureAnonymousSession();
-                let authWarning = null;
-                if (!authRes.ok) {
-                    authWarning = authRes.error;
-                } else {
-                    const { data: sessData, error: sessErr } = await supabaseClient.rpc('get_or_create_weekly_session');
-                    if (!sessErr && sessData) {
-                        const sessRow = Array.isArray(sessData) ? sessData[0] : sessData;
-                        if (sessRow && sessRow.week_start_date) {
-                            activeWeekStartDate = String(sessRow.week_start_date).slice(0, 10);
-                        }
-                    }
-                }
-
-                // 3. Pasang realtime (atau fallback polling bila WebSocket sandbox dilarang)
-                setupRealtimeSubscription();
-
-                if (authWarning) {
-                    const diag = diagnoseSupabaseError(authWarning);
-                    lastCloudDiag = {
-                        state: 'offline',
-                        label: diag.badge,
-                        isAnonDisabled: !!diag.isAnonDisabled,
-                        raw: diag.raw,
-                        hint: diag.hint
-                    };
-                    setCloudStatusUI('offline', diag.badge);
-                    updateDiagModalUI();
-                    return false;
-                }
-
-                lastCloudDiag = {
-                    state: 'live',
-                    label: 'Live (Terhubung)',
-                    isAnonDisabled: false,
-                    raw: '',
-                    hint: ''
-                };
-                setCloudStatusUI('live', 'Live');
-                updateDiagModalUI();
-                if (showFeedback) {
-                    showToast(`✅ Tersinkron (${markers.length} paw komunitas)`);
-                }
-                return true;
-            } catch (err) {
-                console.warn('Gagal sinkronisasi Supabase:', err);
-                const diag = diagnoseSupabaseError(err);
-                lastCloudDiag = {
-                    state: 'offline',
-                    label: diag.badge,
-                    isAnonDisabled: !!diag.isAnonDisabled,
-                    raw: diag.raw,
-                    hint: diag.hint
-                };
-                setCloudStatusUI('offline', diag.badge);
-                updateDiagModalUI();
-                return false;
-            }
-        }
-
-        function setupRealtimeSubscription() {
-            if (!supabaseClient) return;
-            if (!isRealtimeWebSocketAllowed()) {
-                startPollingFallback();
-                return;
-            }
-
-            try {
-                if (realtimeChannel) {
-                    supabaseClient.removeChannel(realtimeChannel);
-                    realtimeChannel = null;
-                }
-                realtimeChannel = supabaseClient
-                    .channel('iyalagi-manjat-markers-live')
-                    .on(
-                        'postgres_changes',
-                        { event: 'INSERT', schema: 'public', table: 'climbing_markers' },
-                        (payload) => {
-                            const mapped = mapMarkerRow(payload.new);
-                            if (mapped) {
-                                upsertLocalMarker(mapped);
-                                updateHeaderCounts();
-                                rebuildMarkers3D(true);
-                            }
-                        }
-                    )
-                    .on(
-                        'postgres_changes',
-                        { event: 'DELETE', schema: 'public', table: 'climbing_markers' },
-                        (payload) => {
-                            const oldId = payload.old && payload.old.id ? String(payload.old.id) : null;                            if (!oldId) return;
-                            markers = markers.filter((m) => m.id !== oldId);
-                            if (selectedMarker && selectedMarker.id === oldId) {
-                                closeMarkerPopup();
-                            }
-                            updateHeaderCounts();
-                            rebuildMarkers3D(true);
-                        }
-                    )
-                    .subscribe((status) => {
-                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                            startPollingFallback();
-                        }
-                    });
-            } catch (err) {
-                console.warn('Realtime WebSocket bypass, menggunakan polling fallback:', err);
-                startPollingFallback();
-            }
-        }
-
-        async function saveMarkerToSupabase(name, position, normal) {
-            const authRes = await ensureAnonymousSession();
-            if (!authRes.ok) {
-                const diag = diagnoseSupabaseError(authRes.error);
-                lastCloudDiag = {
-                    state: 'offline',
-                    label: diag.badge,
-                    isAnonDisabled: !!diag.isAnonDisabled,
-                    raw: diag.raw,
-                    hint: diag.hint
-                };
-                setCloudStatusUI('offline', diag.badge);
-                updateDiagModalUI();
-                if (diag.isAnonDisabled) openCloudDiagModal();
-                throw new Error(diag.hint || diag.badge);
-            }
-
-            const clientUuid = generateUuidV4();
-            const px = Math.max(-3.45, Math.min(3.45, Number(position.x.toFixed(4))));
-            const py = Math.max(0.05, Math.min(19.55, Number(position.y.toFixed(4))));
-            const pz = Math.max(-0.55, Math.min(6.55, Number(position.z.toFixed(4))));
-            const nx = Number(normal.x.toFixed(4));
-            const ny = Number(normal.y.toFixed(4));
-            const nz = Number(normal.z.toFixed(4));
-
-            // Panggil RPC canonical 9 parameter V2.2
-            let res = await supabaseClient.rpc('insert_marker', {
-                p_client_uuid: clientUuid,
-                p_name: name,
-                p_position_x: px,
-                p_position_y: py,
-                p_position_z: pz,
-                p_norm_x: nx,
-                p_norm_y: ny,
-                p_norm_z: nz,
-                p_offline_created_at: null
-            });
-
-            // Fallback otomatis jika server memakai urutan parameter alternatif
-            if (res.error && (res.error.code === 'PGRST202' || String(res.error.message || '').includes('could not find the function'))) {
-                res = await supabaseClient.rpc('insert_marker', {
-                    p_name: name,
-                    p_position_x: px,
-                    p_position_y: py,
-                    p_position_z: pz,
-                    p_norm_x: nx,
-                    p_norm_y: ny,
-                    p_norm_z: nz,
-                    p_client_uuid: clientUuid,
-                    p_is_offline: false,
-                    p_client_created_at: null
-                });
-            }
-
-            if (res.error) throw res.error;
-            const data = res.data;
-
-            if (data && typeof data === 'object' && 'ok' in data) {
-                if (!data.ok) {
-                    throw new Error(data.message || data.code || 'Gagal menyimpan marker.');
-                }
-                const saved = mapMarkerRow(data.marker);
-                if (saved) {
-                    if (!activeWeekStartDate && saved.week_start_date) {
-                        activeWeekStartDate = saved.week_start_date;
-                    }
-                    upsertLocalMarker(saved);
-                    updateHeaderCounts();
-                    rebuildMarkers3D(true);
-                }
-                return saved;
-            }
-
-            const row = Array.isArray(data) ? data[0] : data;
-            const saved = mapMarkerRow(row);
-            if (saved) {
-                upsertLocalMarker(saved);
-                updateHeaderCounts();
-                rebuildMarkers3D(true);
-            } else {
-                await syncFromSupabase(false);
-            }
-            return saved;
-        }
-
-        async function deleteMarkerFromSupabase(markerId) {
-            const { data, error } = await supabaseClient.rpc('delete_marker', {
-                p_marker_id: markerId
-            });
-            if (error) throw error;
-            if (data && typeof data === 'object' && 'deleted' in data && !data.deleted) {
-                throw new Error(data.message || 'Marker tidak dapat dihapus.');
-            }
-            markers = markers.filter((m) => m.id !== markerId);
-            updateHeaderCounts();
-            rebuildMarkers3D(true);
-        }
-
         // =========================================================================
         // 6. PEMBUATAN SCENE 3D WALL PASAR FESTIVAL (LEFT GREY & RIGHT BLUE 19.3M)
         // =========================================================================
@@ -2924,173 +2435,6 @@
         // =========================================================================
         // 8. KONTROL KAMERA (ORBIT + PANNING 4 ARAH MOUSE & TOUCH) & INTERAKSI TAP
         // =========================================================================
-        function resetCamera() {
-            targetLookAt.set(0.15, 9.6, 1.35);
-            targetSpherical.set(25.5, Math.PI * 0.44, 0.34);
-        }
-
-        function zoomCamera(factor) {
-            targetSpherical.radius = Math.max(5.5, Math.min(42, targetSpherical.radius * factor));
-        }
-
-        function setPanMode(enabled) {
-            isPanMode = !!enabled;
-            const btn = document.getElementById('btn-toggle-pan');
-            if (btn) {
-                btn.classList.toggle('btn-icon-active', isPanMode);
-                btn.setAttribute('aria-pressed', isPanMode ? 'true' : 'false');
-            }
-            if (renderer && renderer.domElement) {
-                renderer.domElement.style.cursor = isPanMode ? 'grab' : 'default';
-            }
-        }
-
-        function panCameraByPixels(dx, dy) {
-            if (!camera || !renderer || !targetLookAt || !targetSpherical) return;
-            const viewH = Math.max(1, renderer.domElement.clientHeight || window.innerHeight);
-            const halfFovRad = (camera.fov * 0.5) * (Math.PI / 180);
-            const worldPerPixel = (2 * targetSpherical.radius * Math.tan(halfFovRad)) / viewH;
-
-            const screenRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
-            screenRight.y = 0;
-            if (screenRight.lengthSq() < 0.0001) {
-                screenRight.set(Math.cos(camSpherical.theta), 0, -Math.sin(camSpherical.theta));
-            }
-            screenRight.normalize();
-
-            targetLookAt.addScaledVector(screenRight, -dx * worldPerPixel);
-            targetLookAt.y += dy * worldPerPixel;
-
-            targetLookAt.x = Math.max(-7.5, Math.min(8.5, targetLookAt.x));
-            targetLookAt.y = Math.max(0.5, Math.min(19.5, targetLookAt.y));
-            targetLookAt.z = Math.max(-3.5, Math.min(9.5, targetLookAt.z));
-        }
-
-        function setupCameraControls(domElement) {
-            const onPointerDown = (e) => {
-                activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-                if (activePointers.size === 1) {
-                    isDragging = true;
-                    isPinching = false;
-                    hadMultiTouch = false;
-                    pointerDownPos = { x: e.clientX, y: e.clientY };
-                    lastPointerPos = { x: e.clientX, y: e.clientY };
-                    if (isPanMode || e.button === 2 || e.button === 1 || e.shiftKey) {
-                        domElement.style.cursor = 'grabbing';
-                    }
-                } else if (activePointers.size === 2) {
-                    isDragging = false;
-                    isPinching = true;
-                    hadMultiTouch = true;
-                    const pts = Array.from(activePointers.values());
-                    lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-                    lastPointerPos = {
-                        x: (pts[0].x + pts[1].x) / 2,
-                        y: (pts[0].y + pts[1].y) / 2
-                    };
-                }
-            };
-
-            const onPointerMove = (e) => {
-                if (!activePointers.has(e.pointerId)) return;
-                activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-                if (isPinching && activePointers.size === 2) {
-                    const pts = Array.from(activePointers.values());
-                    const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-                    if (lastPinchDist > 0) {
-                        const scale = lastPinchDist / Math.max(10, dist);
-                        targetSpherical.radius = Math.max(5.5, Math.min(42, targetSpherical.radius * scale));
-                    }
-                    lastPinchDist = dist;
-
-                    const midX = (pts[0].x + pts[1].x) / 2;
-                    const midY = (pts[0].y + pts[1].y) / 2;
-                    const dx = midX - lastPointerPos.x;
-                    const dy = midY - lastPointerPos.y;
-                    panCameraByPixels(dx, dy);
-                    lastPointerPos = { x: midX, y: midY };
-                    return;
-                }
-
-                if (isDragging && activePointers.size === 1) {
-                    const dx = e.clientX - lastPointerPos.x;
-                    const dy = e.clientY - lastPointerPos.y;
-                    lastPointerPos = { x: e.clientX, y: e.clientY };
-
-                    const usePan = isPanMode || (e.buttons & 2) !== 0 || (e.buttons & 4) !== 0 || e.shiftKey;
-                    if (usePan) {
-                        panCameraByPixels(dx, dy);
-                    } else {
-                        targetSpherical.theta -= dx * 0.0068;
-                        targetSpherical.phi = Math.max(0.22, Math.min(Math.PI * 0.495, targetSpherical.phi - dy * 0.0055));
-                    }
-                }
-            };
-
-            const onPointerUp = (e) => {
-                if (!activePointers.has(e.pointerId)) return;
-                const wasSingle = activePointers.size === 1 && !isPinching && !hadMultiTouch;
-                activePointers.delete(e.pointerId);
-
-                if (activePointers.size === 1) {
-                    const remaining = Array.from(activePointers.values())[0];
-                    lastPointerPos = { x: remaining.x, y: remaining.y };
-                    isPinching = false;
-                    isDragging = true;
-                } else if (activePointers.size === 0) {
-                    isPinching = false;
-                    isDragging = false;
-                    hadMultiTouch = false;
-                    domElement.style.cursor = isPanMode ? 'grab' : 'default';
-                }
-
-                if (wasSingle) {
-                    const moved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-                    if (moved < 9) {
-                        handleCanvasTap(e.clientX, e.clientY);
-                    }
-                }
-            };
-
-            const onWheel = (e) => {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    panCameraByPixels(-e.deltaX, -e.deltaY);
-                } else {
-                    const factor = e.deltaY > 0 ? 1.09 : 0.92;
-                    zoomCamera(factor);
-                }
-            };
-
-            const onKeyDown = (e) => {
-                const tag = document.activeElement && document.activeElement.tagName;
-                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-                const stepPx = 42;
-                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-                    e.preventDefault();
-                    panCameraByPixels(0, stepPx);
-                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-                    e.preventDefault();
-                    panCameraByPixels(0, -stepPx);
-                } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-                    e.preventDefault();
-                    panCameraByPixels(stepPx, 0);
-                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-                    e.preventDefault();
-                    panCameraByPixels(-stepPx, 0);
-                }
-            };
-
-            domElement.addEventListener('pointerdown', onPointerDown);
-            window.addEventListener('pointermove', onPointerMove);
-            window.addEventListener('pointerup', onPointerUp);
-            window.addEventListener('pointercancel', onPointerUp);
-            domElement.addEventListener('wheel', onWheel, { passive: false });
-            domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-            window.addEventListener('keydown', onKeyDown);
-        }
-
         function handleCanvasTap(clientX, clientY) {
             if (!renderer || !camera) return;
             const rect = renderer.domElement.getBoundingClientRect();
@@ -3272,20 +2616,20 @@
             on('popup-close-btn', 'click', closeMarkerPopup);
             on('cluster-close-btn', 'click', closeClusterListPopup);
             on('btn-toggle-pan', 'click', () => {
-                setPanMode(!isPanMode);
+                cameraControls.setPanMode(!isPanMode);
                 showToast(isPanMode ? 'Mode Geser (Pan) aktif — seret atas/bawah/kiri/kanan' : 'Mode Putar (Orbit) aktif', 2000);
             });
-            on('btn-reset-cam', 'click', resetCamera);
-            on('btn-zoom-in', 'click', () => zoomCamera(0.82));
-            on('btn-zoom-out', 'click', () => zoomCamera(1.22));
+            on('btn-reset-cam', 'click', cameraControls.resetCamera);
+            on('btn-zoom-in', 'click', () => cameraControls.zoomCamera(0.82));
+            on('btn-zoom-out', 'click', () => cameraControls.zoomCamera(1.22));
             on('btn-toggle-light', 'click', () => {
                 isNightMode = !isNightMode;
                 applyLightingMode();
             });
 
-            on('cloud-status-btn', 'click', openCloudDiagModal);
-            on('cloud-diag-close', 'click', closeCloudDiagModal);
-            on('cloud-diag-ok', 'click', closeCloudDiagModal);
+            on('cloud-status-btn', 'click', supabaseService.openCloudDiagModal);
+            on('cloud-diag-close', 'click', supabaseService.closeCloudDiagModal);
+            on('cloud-diag-ok', 'click', supabaseService.closeCloudDiagModal);
             on('cloud-diag-retry', 'click', async () => {
                 const btn = document.getElementById('cloud-diag-retry');
                 if (btn) {
@@ -3293,12 +2637,12 @@
                     btn.textContent = 'Menghubungkan...';
                 }
                 await loadFirstAvailable(SUPABASE_CDNS, () => !!(window.supabase && window.supabase.createClient));
-                const ok = await syncFromSupabase(true);
+                const ok = await supabaseService.syncFromSupabase(true);
                 if (btn) {
                     btn.disabled = false;
                     btn.textContent = 'Coba Hubungkan Ulang';
                 }
-                if (ok) closeCloudDiagModal();
+                if (ok) supabaseService.closeCloudDiagModal();
             });
 
             on('input-climber-name', 'input', (e) => {
@@ -3324,7 +2668,7 @@
                     saveBtn.textContent = 'Menyimpan...';
                 }
                 try {
-                    await saveMarkerToSupabase(cleanName, pendingPlacement.position, pendingPlacement.normal);
+                    await supabaseService.saveMarkerToSupabase(cleanName, pendingPlacement.position, pendingPlacement.normal);
                     if (inp) inp.value = '';
                     const cnt = document.getElementById('name-char-count');
                     if (cnt) cnt.textContent = '0/32';
@@ -3350,7 +2694,7 @@
                     btn.textContent = 'Menghapus...';
                 }
                 try {
-                    await deleteMarkerFromSupabase(targetId);
+                    await supabaseService.deleteMarkerFromSupabase(targetId);
                     closeMarkerPopup();
                     showToast('Marker berhasil dihapus.');
                 } catch (err) {
@@ -3364,10 +2708,10 @@
             });
 
             window.addEventListener('resize', onWindowResize);
-            window.addEventListener('online', () => syncFromSupabase(false));
+            window.addEventListener('online', () => supabaseService.syncFromSupabase(false));
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && navigator.onLine) {
-                    syncFromSupabase(false);
+                    supabaseService.syncFromSupabase(false);
                 }
             });
         }
@@ -3516,7 +2860,7 @@
                 scene.add(pinsGroup);
                 scene.add(previewGroup);
 
-                setupCameraControls(renderer.domElement);
+                cameraControls.setupCameraControls(renderer.domElement);
                 animate(0);
 
                 const overlay = document.getElementById('loading-overlay');
@@ -3526,7 +2870,7 @@
                 }
 
                 await loadFirstAvailable(SUPABASE_CDNS, () => !!(window.supabase && window.supabase.createClient));
-                await syncFromSupabase(false);
+                await supabaseService.syncFromSupabase(false);
             } catch (err) {
                 console.error('Init 3D error:', err);
                 showFatalError(err && err.message ? err.message : String(err));
