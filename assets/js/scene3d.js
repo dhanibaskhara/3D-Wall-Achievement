@@ -24,11 +24,11 @@ export function createScene3D(appState, deps) {
         // Proyeksikan koordinat tepat ke permukaan dinding aktual agar marker menempel rapat
         function snapPointToWallSurface(x, y) {
             const isRight = x >= 0;
-            const profile = isRight ? rightProfile : leftProfile;
-            const cx = isRight ? RIGHT_CENTER_X : LEFT_CENTER_X;
-            const halfW = WALL_WIDTH / 2;
+            const profile = isRight ? deps.rightProfile : deps.leftProfile;
+            const cx = isRight ? deps.RIGHT_CENTER_X : deps.LEFT_CENTER_X;
+            const halfW = deps.WALL_WIDTH / 2;
             const clampedX = Math.max(cx - halfW + 0.05, Math.min(cx + halfW - 0.05, x));
-            const clampedY = Math.max(0.08, Math.min(WALL_HEIGHT - 0.08, y));
+            const clampedY = Math.max(0.08, Math.min(deps.WALL_HEIGHT - 0.08, y));
             const surf = getWallSurfaceAtY(profile, clampedY);
             return {
                 pos: new deps.THREE.Vector3(clampedX, clampedY, surf.z),
@@ -128,7 +128,7 @@ export function createScene3D(appState, deps) {
 
             for (let i = 0; i < profile.length; i++) {
                 const [y, z] = profile[i];
-                const v = y / WALL_HEIGHT;
+                const v = y / deps.WALL_HEIGHT;
                 frontPositions.push(centerX - halfW, y, z);
                 frontUvs.push(0, v);
                 frontPositions.push(centerX + halfW, y, z);
@@ -245,10 +245,10 @@ export function createScene3D(appState, deps) {
             const buildTowerTruss = (centerX, profile, backZ) => {
                 const xCols = [centerX - 1.35, centerX, centerX + 1.35];
                 const levels = [];
-                for (let y = 0; y <= WALL_HEIGHT; y += 2.4125) {
-                    levels.push(Math.min(WALL_HEIGHT, y));
+                for (let y = 0; y <= deps.WALL_HEIGHT; y += 2.4125) {
+                    levels.push(Math.min(deps.WALL_HEIGHT, y));
                 }
-                if (levels[levels.length - 1] < WALL_HEIGHT - 0.05) levels.push(WALL_HEIGHT);
+                if (levels[levels.length - 1] < deps.WALL_HEIGHT - 0.05) levels.push(deps.WALL_HEIGHT);
 
                 xCols.forEach((x) => {
                     for (let i = 0; i < levels.length - 1; i++) {
@@ -285,20 +285,20 @@ export function createScene3D(appState, deps) {
                 }
             };
 
-            buildTowerTruss(LEFT_CENTER_X, leftProfile, -1.9);
-            buildTowerTruss(RIGHT_CENTER_X, rightProfile, -1.9);
+            buildTowerTruss(deps.LEFT_CENTER_X, deps.leftProfile, -1.9);
+            buildTowerTruss(deps.RIGHT_CENTER_X, deps.rightProfile, -1.9);
 
-            for (let y = 2.4; y <= WALL_HEIGHT; y += 4.8) {
-                addStrut(group, new deps.THREE.Vector3(LEFT_CENTER_X + 1.35, y, -1.9), new deps.THREE.Vector3(RIGHT_CENTER_X - 1.35, y, -1.9), 0.045, steelMat);
+            for (let y = 2.4; y <= deps.WALL_HEIGHT; y += 4.8) {
+                addStrut(group, new deps.THREE.Vector3(deps.LEFT_CENTER_X + 1.35, y, -1.9), new deps.THREE.Vector3(deps.RIGHT_CENTER_X - 1.35, y, -1.9), 0.045, steelMat);
             }
 
             const roofMat = new deps.THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.7, metalness: 0.25 });
             const canopy = new deps.THREE.Mesh(new deps.THREE.BoxGeometry(1.7, 0.09, 2.4), roofMat);
-            canopy.position.set(RIGHT_CENTER_X + 2.15, 11.4, 0.35);
+            canopy.position.set(deps.RIGHT_CENTER_X + 2.15, 11.4, 0.35);
             canopy.rotation.z = -0.14;
             group.add(canopy);
-            addStrut(group, new deps.THREE.Vector3(RIGHT_CENTER_X + 1.45, 9.8, 0.9), new deps.THREE.Vector3(RIGHT_CENTER_X + 2.8, 11.2, 0.9), 0.035, steelMat);
-            addStrut(group, new deps.THREE.Vector3(RIGHT_CENTER_X + 1.45, 9.8, -0.3), new deps.THREE.Vector3(RIGHT_CENTER_X + 2.8, 11.2, -0.3), 0.035, steelMat);
+            addStrut(group, new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 1.45, 9.8, 0.9), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, 0.9), 0.035, steelMat);
+            addStrut(group, new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 1.45, 9.8, -0.3), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, -0.3), 0.035, steelMat);
 
             appState.scene.add(group);
         }
@@ -310,8 +310,8 @@ export function createScene3D(appState, deps) {
 
             // Helper penempatan hold menempel rapat mengikuti kontur & normal permukaan wall
             const placeOnWall = (obj, isRight, localX, y, lift = 0.0) => {
-                const profile = isRight ? rightProfile : leftProfile;
-                const cx = isRight ? RIGHT_CENTER_X : LEFT_CENTER_X;
+                const profile = isRight ? deps.rightProfile : deps.leftProfile;
+                const cx = isRight ? deps.RIGHT_CENTER_X : deps.LEFT_CENTER_X;
                 const surf = getWallSurfaceAtY(profile, y);
                 obj.position.set(cx + localX, y, surf.z);
                 obj.position.addScaledVector(surf.normal, lift);
@@ -723,10 +723,10 @@ export function createScene3D(appState, deps) {
 
                 for (let i = 0; i < total; i++) {
                     const isRight = i >= leftCount;
-                    const profile = isRight ? rightProfile : leftProfile;
-                    const cx = isRight ? RIGHT_CENTER_X : LEFT_CENTER_X;
-                    const lx = (rng() - 0.5) * (WALL_WIDTH - 0.24);
-                    const y = 0.55 + rng() * (WALL_HEIGHT - 0.95);
+                    const profile = isRight ? deps.rightProfile : deps.leftProfile;
+                    const cx = isRight ? deps.RIGHT_CENTER_X : deps.LEFT_CENTER_X;
+                    const lx = (rng() - 0.5) * (deps.WALL_WIDTH - 0.24);
+                    const y = 0.55 + rng() * (deps.WALL_HEIGHT - 0.95);
                     const surf = getWallSurfaceAtY(profile, y);
 
                     dummy.position.set(cx + lx, y, surf.z).addScaledVector(surf.normal, lift);
@@ -759,8 +759,8 @@ export function createScene3D(appState, deps) {
             const anchorGeo = new deps.THREE.TorusGeometry(0.08, 0.02, 6, 12);
 
             [false, true].forEach((isRight) => {
-                const profile = isRight ? rightProfile : leftProfile;
-                const cx = isRight ? RIGHT_CENTER_X : LEFT_CENTER_X;
+                const profile = isRight ? deps.rightProfile : deps.leftProfile;
+                const cx = isRight ? deps.RIGHT_CENTER_X : deps.LEFT_CENTER_X;
                 for (let y = 3.2; y <= 17.6; y += 2.4) {
                     const surf = getWallSurfaceAtY(profile, y);
                     const qd = new deps.THREE.Mesh(qdGeo, slingMat);
@@ -1462,7 +1462,7 @@ export function createScene3D(appState, deps) {
             const barMat = new deps.THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.4, metalness: 0.65 });
             const steelMat = new deps.THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.55, metalness: 0.75 });
 
-            const hangBarX = RIGHT_CENTER_X + 2.45;
+            const hangBarX = deps.RIGHT_CENTER_X + 2.45;
             const hangBarY = 10.85;
             const hangBarZ = 0.42;
 
