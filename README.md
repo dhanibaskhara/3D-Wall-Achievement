@@ -6,27 +6,31 @@ Standalone Three.js experience for the Iyalagi.Manjat community.
 
 ```text
 .
-├── index.html              # Page structure and external asset references
+├── index.html
 ├── assets/
 │   ├── css/
-│   │   └── styles.css      # Page and interface styles
+│   │   └── styles.css
 │   └── js/
-│       └── app.js          # Three.js scene, interactions and Supabase integration
+│       ├── app.js               # Application bootstrap and scene composition
+│       ├── camera-controls.js   # Orbit, pan, pinch and keyboard controls
+│       ├── markers.js           # 3D paw markers, previews and clustering
+│       ├── supabase.js          # Authentication, database and Realtime
+│       └── utils.js             # Pure shared helpers
 └── README.md
 ```
 
 ## Deployment
 
-This is a static site. Vercel should use the repository root as the project root and does not require a build command or output directory override. The production entry point is `index.html`.
+Static site. Configure Vercel with the repository root as the project root. No build command or output directory override is required; the entry point is `index.html`.
 
-## External runtime dependencies
+## Runtime dependencies
 
 - Tailwind CSS CDN
-- Three.js r128 (CDN fallback list is configured in `assets/js/app.js`)
-- Supabase JS v2 (CDN fallback list is configured in `assets/js/app.js`)
+- Three.js r128 (CDN fallback list is configured in the application)
+- Supabase JS v2 (CDN fallback list is configured in the application)
 
-The Supabase publishable key is intended for browser use. Database access must remain protected by Row Level Security and server-side RPC validation. Never put a Supabase service-role key in frontend code.
+The browser uses a Supabase publishable key. Database access must remain protected by Row Level Security and server-side RPC validation. Never put a Supabase service-role key in frontend code.
 
-## Refactor note
+## Architecture notes
 
-The initial structural refactor separates markup, styles and application logic while preserving the existing IIFE and runtime behavior. The JavaScript is intentionally kept together in this first pass because its state and functions are tightly coupled. Further extraction into scene, marker, Supabase and camera modules should be done with behavior tests for each module.
+The application is loaded as an ES module. Shared mutable application state is passed to feature factories through explicit getter/setter objects. The scene geometry and environment remain in `app.js` for now because they are tightly coupled to the original scene construction. They can be extracted in a later, behavior-tested refactor.
