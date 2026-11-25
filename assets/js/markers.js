@@ -216,7 +216,7 @@ export function createMarkerRenderer(appState, deps) {
                     const sn = deps.snapPointToWallSurface(m.position_x, m.position_y);
                     return {
                         isCluster: false,
-                        appState.markers: [m],
+                        markers: [m],
                         pos: sn.pos,
                         normal: sn.normal
                     };
@@ -251,7 +251,7 @@ export function createMarkerRenderer(appState, deps) {
                 const sn = deps.snapPointToWallSurface(avgX, avgY);
                 out.push({
                     isCluster: n > 1,
-                    appState.markers: clusterItems,
+                    markers: clusterItems,
                     pos: sn.pos,
                     normal: sn.normal
                 });
@@ -317,15 +317,15 @@ export function createMarkerRenderer(appState, deps) {
 
                 // 1. Marker tunggal: menempel sangat rapat ke permukaan dinding (offset normal hanya 1,2 cm)
                 if (!c.isCluster) {
-                    const m = c.appState.markers[0];
+                    const m = c.markers[0];
                     const pos = c.pos.clone().addScaledVector(norm, 0.012);
                     placeSinglePaw(m, pos, norm);
                     return;
                 }
 
                 // 2. Zoom dekat & 2–10 paw bertumpuk di titik sama -> Auto-Spiderfy (mekar sejajar dinding)
-                if (isCloseZoom && c.appState.markers.length <= MAX_SPIDERFY_COUNT) {
-                    const sorted = [...c.appState.markers].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+                if (isCloseZoom && c.markers.length <= MAX_SPIDERFY_COUNT) {
+                    const sorted = [...c.markers].sort((a, b) => String(a.id).localeCompare(String(b.id)));
                     const n = sorted.length;
                     const anchorPos = c.pos.clone().addScaledVector(norm, 0.012);
 
@@ -364,7 +364,7 @@ export function createMarkerRenderer(appState, deps) {
                 }
 
                 // 3. Zoom jauh/sedang ATAU >10 paw di satu titik -> Cluster Badge rapat
-                const badge = createClusterBadge3D(c.appState.markers.length);
+                const badge = createClusterBadge3D(c.markers.length);
                 badge.position.copy(c.pos).addScaledVector(norm, 0.045);
                 appState.pinsGroup.add(badge);
 
@@ -374,8 +374,8 @@ export function createMarkerRenderer(appState, deps) {
                 hit.userData = {
                     type: 'cluster',
                     targetPos: c.pos.clone(),
-                    count: c.appState.markers.length,
-                    appState.markers: c.appState.markers,
+                    count: c.markers.length,
+                    markers: c.markers,
                     isDenseCluster: isCloseZoom
                 };
                 appState.pinsGroup.add(hit);
