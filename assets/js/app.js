@@ -102,6 +102,7 @@ import { createMarkerRenderer } from './markers.js';
         const markerState = {};
         Object.defineProperties(markerState, {
             pinsGroup: { get: () => pinsGroup, set: (value) => { pinsGroup = value; } },
+            camSpherical: { get: () => camSpherical, set: (value) => { camSpherical = value; } },
             previewGroup: { get: () => previewGroup, set: (value) => { previewGroup = value; } },
             markers: { get: () => markers, set: (value) => { markers = value; } },
             renderedPawEntries: { get: () => renderedPawEntries, set: (value) => { renderedPawEntries = value; } },
