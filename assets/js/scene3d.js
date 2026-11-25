@@ -1220,6 +1220,209 @@ export function createScene3D(appState, deps) {
             return { root, bodyGroup, headGroup, tailPivot, legs };
         }
 
+
+        // Gerobak bakso modular dengan display kaca, panci kuah, kanopi, dan uap.
+        function buildBaksoCart() {
+            const cart = new deps.THREE.Group();
+            const steam = [];
+
+            const woodMat = new deps.THREE.MeshStandardMaterial({ color: 0x754322, roughness: 0.82 });
+            const darkWoodMat = new deps.THREE.MeshStandardMaterial({ color: 0x422719, roughness: 0.88 });
+            const trimMat = new deps.THREE.MeshStandardMaterial({ color: 0xc48a4b, roughness: 0.72 });
+            const redMat = new deps.THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.76 });
+            const creamMat = new deps.THREE.MeshStandardMaterial({ color: 0xfff1cf, roughness: 0.84 });
+            const steelMat = new deps.THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.34, metalness: 0.78 });
+            const tireMat = new deps.THREE.MeshStandardMaterial({ color: 0x20242a, roughness: 0.94 });
+            const glassMat = new deps.THREE.MeshStandardMaterial({
+                color: 0xdff7ff, transparent: true, opacity: 0.22, roughness: 0.12,
+                metalness: 0.04, depthWrite: false, side: deps.THREE.DoubleSide
+            });
+
+            const addBox = (w, h, d, material, x, y, z) => {
+                const mesh = new deps.THREE.Mesh(new deps.THREE.BoxGeometry(w, h, d), material);
+                mesh.position.set(x, y, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                cart.add(mesh);
+                return mesh;
+            };
+
+            const addCylinder = (radiusTop, radiusBottom, height, material, x, y, z, segments = 16) => {
+                const mesh = new deps.THREE.Mesh(
+                    new deps.THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+                    material
+                );
+                mesh.position.set(x, y, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                cart.add(mesh);
+                return mesh;
+            };
+
+            // Rangka bawah, kabinet kayu, dan bidang depan gerobak.
+            addBox(1.46, 0.68, 0.82, woodMat, 0, 0.62, 0);
+            addBox(1.34, 0.38, 0.045, darkWoodMat, 0, 0.65, 0.425);
+            addBox(1.30, 0.045, 0.055, trimMat, 0, 0.86, 0.455);
+            addBox(1.30, 0.045, 0.055, trimMat, 0, 0.44, 0.455);
+            for (let i = 0; i < 5; i++) {
+                addBox(0.035, 0.30, 0.018, trimMat, -0.49 + i * 0.245, 0.65, 0.458);
+            }
+            addBox(1.62, 0.09, 0.94, darkWoodMat, 0, 1.005, 0);
+            addBox(1.58, 0.045, 0.91, trimMat, 0, 1.065, 0);
+
+            // Roda besar, hub logam, serta kaki penyangga.
+            for (const x of [-0.57, 0.57]) {
+                const wheel = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.235, 0.235, 0.13, 20), tireMat);
+                wheel.rotation.x = Math.PI / 2;
+                wheel.position.set(x, 0.265, 0.30);
+                wheel.castShadow = true;
+                cart.add(wheel);
+
+                const hub = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.105, 0.105, 0.145, 16), steelMat);
+                hub.rotation.x = Math.PI / 2;
+                hub.position.set(x, 0.265, 0.30);
+                hub.castShadow = true;
+                cart.add(hub);
+
+                addBox(0.09, 0.20, 0.10, darkWoodMat, x, 0.17, -0.18);
+            }
+
+            // Pegangan di bagian belakang.
+            for (const x of [-0.57, 0.57]) {
+                const handle = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.025, 0.025, 0.48, 8), steelMat);
+                handle.rotation.x = Math.PI / 2;
+                handle.position.set(x, 0.82, -0.62);
+                cart.add(handle);
+                addBox(0.07, 0.07, 0.08, darkWoodMat, x, 0.82, -0.86);
+            }
+
+            // Etalase kaca berisi mangkuk dan bakso.
+            const caseX = -0.30;
+            const caseY = 1.34;
+            const caseZ = -0.035;
+            addBox(0.91, 0.035, 0.58, steelMat, caseX, 1.105, caseZ);
+            addBox(0.91, 0.035, 0.58, glassMat, caseX, 1.57, caseZ);
+            addBox(0.91, 0.45, 0.025, glassMat, caseX, caseY, 0.255);
+            addBox(0.91, 0.45, 0.025, glassMat, caseX, caseY, -0.325);
+            for (const x of [caseX - 0.455, caseX + 0.455]) {
+                addBox(0.025, 0.46, 0.58, glassMat, x, caseY, caseZ);
+                addBox(0.035, 0.49, 0.035, trimMat, x, caseY, 0.255);
+                addBox(0.035, 0.49, 0.035, trimMat, x, caseY, -0.325);
+            }
+            addBox(0.88, 0.025, 0.035, trimMat, caseX, 1.105, 0.27);
+            addBox(0.88, 0.025, 0.035, trimMat, caseX, 1.57, 0.27);
+
+            const bowlMat = new deps.THREE.MeshStandardMaterial({ color: 0xf1eee5, roughness: 0.42 });
+            const meatballMat = new deps.THREE.MeshStandardMaterial({ color: 0x9b8068, roughness: 0.86 });
+            for (let row = 0; row < 2; row++) {
+                const bowlX = caseX - 0.20 + row * 0.39;
+                const bowl = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.17, 0.13, 0.055, 14), bowlMat);
+                bowl.position.set(bowlX, 1.145, -0.035);
+                cart.add(bowl);
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2 + row * 0.35;
+                    const ball = new deps.THREE.Mesh(new deps.THREE.SphereGeometry(0.052, 10, 8), meatballMat);
+                    ball.position.set(bowlX + Math.cos(angle) * 0.075, 1.205, -0.035 + Math.sin(angle) * 0.075);
+                    ball.castShadow = true;
+                    cart.add(ball);
+                }
+                const centerBall = new deps.THREE.Mesh(new deps.THREE.SphereGeometry(0.055, 10, 8), meatballMat);
+                centerBall.position.set(bowlX, 1.225, -0.035);
+                cart.add(centerBall);
+            }
+
+            // Panci kuah stainless steel di sisi kanan meja.
+            const potBody = addCylinder(0.215, 0.235, 0.34, steelMat, 0.48, 1.255, -0.035, 20);
+            const potRim = new deps.THREE.Mesh(new deps.THREE.TorusGeometry(0.22, 0.025, 8, 24), steelMat);
+            potRim.position.set(0.48, 1.43, -0.035);
+            cart.add(potRim);
+            addCylinder(0.225, 0.225, 0.035, steelMat, 0.48, 1.455, -0.035, 20);
+            addCylinder(0.052, 0.052, 0.055, darkWoodMat, 0.48, 1.50, -0.035, 10);
+            const ladle = new deps.THREE.Mesh(new deps.THREE.TorusGeometry(0.075, 0.012, 6, 12), steelMat);
+            ladle.position.set(0.70, 1.36, 0.19);
+            ladle.rotation.x = Math.PI / 2;
+            cart.add(ladle);
+
+            // Botol kecap dan sambal di depan panci.
+            const sauceRed = new deps.THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.35 });
+            const sauceDark = new deps.THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.38 });
+            for (const item of [
+                { x: 0.70, color: sauceRed },
+                { x: 0.88, color: sauceDark }
+            ]) {
+                addCylinder(0.052, 0.065, 0.17, item.color, item.x, 1.18, 0.28, 12);
+                addCylinder(0.022, 0.022, 0.055, creamMat, item.x, 1.29, 0.28, 10);
+            }
+
+            // Tiang dan kanopi kain merah-putih khas gerobak kaki lima.
+            for (const x of [-0.75, 0.75]) {
+                for (const z of [-0.39, 0.39]) {
+                    const pole = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.025, 0.03, 1.08, 8), steelMat);
+                    pole.position.set(x, 1.62, z);
+                    cart.add(pole);
+                }
+            }
+            addBox(1.78, 0.09, 1.02, darkWoodMat, 0, 2.12, 0);
+            for (let i = 0; i < 7; i++) {
+                const stripeMat = i % 2 === 0 ? redMat : creamMat;
+                addBox(0.252, 0.045, 0.98, stripeMat, -0.756 + i * 0.252, 2.19, 0);
+                addBox(0.252, 0.16, 0.055, stripeMat, -0.756 + i * 0.252, 2.07, 0.515);
+            }
+
+            // Papan nama bertekstur tulisan BAKSO, menghadap ke kamera utama.
+            const signCanvas = document.createElement('canvas');
+            signCanvas.width = 640;
+            signCanvas.height = 180;
+            const signCtx = signCanvas.getContext('2d');
+            signCtx.fillStyle = '#991b1b';
+            signCtx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+            signCtx.strokeStyle = '#ffedd5';
+            signCtx.lineWidth = 12;
+            signCtx.strokeRect(8, 8, signCanvas.width - 16, signCanvas.height - 16);
+            signCtx.textAlign = 'center';
+            signCtx.textBaseline = 'middle';
+            signCtx.fillStyle = '#fff7ed';
+            signCtx.font = 'bold 92px Arial, sans-serif';
+            signCtx.fillText('BAKSO', 320, 78);
+            signCtx.fillStyle = '#fde68a';
+            signCtx.font = 'bold 30px Arial, sans-serif';
+            signCtx.fillText('MALANG  •  MIE AYAM', 320, 137);
+
+            const signTexture = new deps.THREE.CanvasTexture(signCanvas);
+            signTexture.encoding = deps.THREE.sRGBEncoding;
+            const signFrame = addBox(1.52, 0.43, 0.085, darkWoodMat, 0, 2.43, 0.47);
+            signFrame.castShadow = true;
+            const signFace = new deps.THREE.Mesh(
+                new deps.THREE.PlaneGeometry(1.42, 0.35),
+                new deps.THREE.MeshBasicMaterial({ map: signTexture })
+            );
+            signFace.position.set(0, 2.43, 0.517);
+            cart.add(signFace);
+
+            // Uap tipis dari panci kuah, dianimasikan mengikuti siklus naik.
+            const steamGeometry = new deps.THREE.SphereGeometry(0.035, 7, 7);
+            for (let i = 0; i < 4; i++) {
+                const steamMat = new deps.THREE.MeshBasicMaterial({
+                    color: 0xffffff, transparent: true, opacity: 0.34, depthWrite: false
+                });
+                const puff = new deps.THREE.Mesh(steamGeometry, steamMat);
+                puff.position.set(0.48, 1.56 + i * 0.06, -0.035);
+                cart.add(puff);
+                steam.push({
+                    mesh: puff,
+                    mat: steamMat,
+                    baseX: 0.48,
+                    baseY: 1.56,
+                    baseZ: -0.035,
+                    phase: i * 0.25
+                });
+            }
+
+            cart.position.set(4.05, 0, 0.85);
+            cart.rotation.y = -0.12;
+            return { group: cart, steam };
+        }
+
         function buildLivingCommunityActivities() {
             const group = new deps.THREE.Group();
             appState.scene.add(group);
@@ -1231,9 +1434,14 @@ export function createScene3D(appState, deps) {
                 spectators: [],
                 hanger: null,
                 coffeeSteam: [],
+                baksoSteam: [],
                 cats: [],
                 chalkPuffs: []
             };
+
+            const baksoCart = buildBaksoCart();
+            group.add(baksoCart.group);
+            actors.baksoSteam = baksoCart.steam;
 
             // Pohon rindang hanya di sebelah kiri wall
             actors.treeCrown = buildLeftTreeOnly();
@@ -1713,6 +1921,19 @@ export function createScene3D(appState, deps) {
                     st.mesh.scale.setScalar(0.55 + cyc * 1.1);
                     st.mat.opacity = (1 - cyc) * 0.42;
                 }
+            }
+
+            // Uap gerobak bakso bergerak naik perlahan dari panci kuah.
+            for (let s = 0; s < appState.livingActors.baksoSteam.length; s++) {
+                const st = appState.livingActors.baksoSteam[s];
+                const cycle = ((sec * 0.48 + st.phase) % 1);
+                st.mesh.position.set(
+                    st.baseX + Math.sin(sec * 2.4 + s) * 0.022,
+                    st.baseY + cycle * 0.38,
+                    st.baseZ + Math.cos(sec * 1.8 + s) * 0.012
+                );
+                st.mesh.scale.setScalar(0.55 + cycle * 1.25);
+                st.mat.opacity = (1 - cycle) * 0.34;
             }
 
             // 4. Animasi kucing wara-wiri di bawah wall
