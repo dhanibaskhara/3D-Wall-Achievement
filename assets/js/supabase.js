@@ -50,7 +50,8 @@ export function createSupabaseService(appState, deps) {
             const status = err && err.status ? String(err.status) : '';
             const msg = err && err.message ? String(err.message) : String(err || 'Unknown error');
             const details = err && err.details ? ` (${err.details})` : '';
-            const raw = `${code ? `[${code}] ` : ''}${status ? `(HTTP ${status}) ` : ''}${msg}${details}`;
+            const hint = err && err.hint ? ` Hint: ${err.hint}` : '';
+            const raw = `${code ? `[${code}] ` : ''}${status ? `(HTTP ${status}) ` : ''}${msg}${details}${hint}`;
             const lower = raw.toLowerCase();
 
             if (lower.includes('anonymous_provider_disabled') || lower.includes('anonymous sign-ins are disabled')) {
@@ -75,6 +76,14 @@ export function createSupabaseService(appState, deps) {
                     isAnonDisabled: false,
                     raw,
                     hint: 'Fungsi RPC tidak ditemukan atau signature parameter berbeda dengan database Supabase.'
+                };
+            }
+            if (lower.includes('get_or_create_weekly_session') || lower.includes('weekly_session_invalid_response')) {
+                return {
+                    badge: 'Cek Sesi Mingguan',
+                    isAnonDisabled: false,
+                    raw,
+                    hint: 'RPC sesi mingguan gagal atau tidak mengembalikan week_start_date yang valid. Periksa fungsi RPC dan hak aksesnya di Supabase.'
                 };
             }
             if (lower.includes('42501') || lower.includes('permission denied') || lower.includes('row-level security')) {
@@ -253,8 +262,10 @@ export function createSupabaseService(appState, deps) {
             const cntEl = document.getElementById('marker-count-label');
             if (cntEl) cntEl.textContent = `${appState.markers.length} paw`;
             const wkEl = document.getElementById('week-badge-label');
-            if (wkEl && appState.activeWeekStartDate) {
-                wkEl.textContent = ` · ${deps.formatDateIndo(appState.activeWeekStartDate)}`;
+            if (wkEl) {
+                wkEl.textContent = appState.activeWeekStartDate
+                    ? ` · ${deps.formatDateIndo(appState.activeWeekStartDate)}`
+                    : '';
             }
         }
 
@@ -306,37 +317,49 @@ export function createSupabaseService(appState, deps) {
                 updateHeaderCounts();
                 deps.rebuildMarkers3D(true);
 
-                // 2. Pastikan sesi Anonymous Auth untuk hak simpan/hapus marker
+                // 2. Pastikan sesi Anonymous Auth untuk hak simpan/hapus marker.
                 const authRes = await ensureAnonymousSession();
-                let authWarning = null;
                 if (!authRes.ok) {
-                    authWarning = authRes.error;
-                } else {
-                    const { data: sessData, error: sessErr } = await appState.supabaseClient.rpc('get_or_create_weekly_session');
-                    if (!sessErr && sessData) {
-                        const sessRow = Array.isArray(sessData) ? sessData[0] : sessData;
-                        if (sessRow && sessRow.week_start_date) {
-                            appState.activeWeekStartDate = String(sessRow.week_start_date).slice(0, 10);
-                        }
-                    }
+                    throw authRes.error || new Error('Anonymous Auth gagal dibuat atau dipulihkan.');
                 }
 
-                // 3. Pasang realtime (atau fallback polling bila WebSocket sandbox dilarang)
+                // Jangan pertahankan tanggal sesi lama bila RPC sesi mingguan gagal.
+                appState.activeWeekStartDate = null;
+                updateHeaderCounts();
+
+                const { data: sessData, error: sessErr } = await appState.supabaseClient.rpc('get_or_create_weekly_session');
+                if (sessErr) {
+                    console.error('RPC get_or_create_weekly_session gagal:', sessErr);
+                    throw sessErr;
+                }
+
+                const sessRow = Array.isArray(sessData) ? sessData[0] : sessData;
+                const weekStartDate = sessRow && sessRow.week_start_date
+                    ? String(sessRow.week_start_date).slice(0, 10)
+                    : '';
+
+                const parsedWeekStartDate = /^\d{4}-\d{2}-\d{2}$/.test(weekStartDate)
+                    ? new Date(`${weekStartDate}T00:00:00Z`)
+                    : null;
+
+                if (
+                    !parsedWeekStartDate ||
+                    Number.isNaN(parsedWeekStartDate.getTime()) ||
+                    parsedWeekStartDate.toISOString().slice(0, 10) !== weekStartDate
+                ) {
+                    const sessionError = new Error(
+                        'RPC get_or_create_weekly_session tidak mengembalikan week_start_date yang valid.'
+                    );
+                    sessionError.code = 'WEEKLY_SESSION_INVALID_RESPONSE';
+                    throw sessionError;
+                }
+
+                appState.activeWeekStartDate = weekStartDate;
+                updateHeaderCounts();
+
+                // 3. Pasang realtime (atau fallback polling bila WebSocket sandbox dilarang).
+                // Status Live baru boleh ditampilkan setelah RPC sesi mingguan tervalidasi.
                 await setupRealtimeSubscription();
-
-                if (authWarning) {
-                    const diag = diagnoseSupabaseError(authWarning);
-                    appState.lastCloudDiag = {
-                        state: 'offline',
-                        label: diag.badge,
-                        isAnonDisabled: !!diag.isAnonDisabled,
-                        raw: diag.raw,
-                        hint: diag.hint
-                    };
-                    setCloudStatusUI('offline', diag.badge);
-                    updateDiagModalUI();
-                    return false;
-                }
 
                 appState.lastCloudDiag = {
                     state: 'live',
