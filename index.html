@@ -32,7 +32,7 @@
     </div>
 
     <!-- Top Navigation Bar -->
-    <header class="fixed top-3 left-3 right-3 z-20 flex items-start justify-between gap-2 pointer-events-none">
+    <header id="wall-header" class="fixed top-3 left-3 right-3 z-20 flex items-start justify-between gap-2 pointer-events-none" aria-label="Navigasi dan kontrol 3D Wall">
         <!-- Brand & Live Cloud Status -->
         <div class="glass-panel rounded-2xl px-3.5 py-2.5 flex items-center gap-3 pointer-events-auto max-w-[78vw]">
             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-400 flex items-center justify-center text-slate-950 shadow-md shrink-0">
@@ -61,7 +61,7 @@
         </div>
 
         <!-- Right Quick Camera Controls -->
-        <div class="glass-panel rounded-2xl p-1.5 flex flex-col sm:flex-row items-center gap-1 pointer-events-auto">
+        <div id="camera-toolbar" class="glass-panel rounded-2xl p-1.5 flex flex-col sm:flex-row items-center gap-1 pointer-events-auto" role="group" aria-label="Kontrol kamera 3D">
             <button id="btn-toggle-pan" type="button" class="btn-icon" title="Mode Geser (Pan Atas/Bawah/Kiri/Kanan)" aria-label="Mode Geser Kamera" aria-pressed="false">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 9l-3 3 3 3"></path>
@@ -109,7 +109,7 @@
     <div id="add-mode-banner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
         <div class="glass-panel rounded-full px-4 py-2 flex items-center gap-3 border-emerald-400/50 bg-emerald-950/80 text-emerald-100 text-xs font-semibold shadow-xl whitespace-nowrap">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            <span>Ketuk titik yang kamu capai di dinding 3D</span>
+            <span>Pilih posisi tertinggi yang berhasil kamu capai</span>
             <button id="cancel-add-mode-btn" type="button"
                 class="px-2.5 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold transition">
                 Batal
@@ -118,19 +118,15 @@
     </div>
 
     <!-- Bottom Legend & Primary CTA -->
-    <div class="fixed bottom-4 left-3 right-3 z-20 flex items-end justify-between gap-3 pointer-events-none">
+    <div id="wall-bottom-bar" class="fixed bottom-4 left-3 right-3 z-20 flex items-end justify-between gap-3 pointer-events-none">
         <!-- Compact Legend -->
-        <div class="glass-panel rounded-2xl px-3 py-2 text-[10px] sm:text-[11px] text-slate-200 space-y-1 pointer-events-auto">
-            <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_8px_#fb923c]"></span>
-                <span>Paw Minggu Ini</span>
+        <div id="wall-legend" class="wall-legend glass-panel rounded-2xl px-3 py-2 text-[10px] sm:text-[11px] text-slate-200 space-y-1 pointer-events-auto" aria-label="Legenda dan petunjuk kontrol">
+            <div class="legend-items">
+                <span class="legend-item"><span class="legend-dot legend-dot-current"></span><span>Minggu ini</span></span>
+                <span class="legend-item"><span class="legend-dot legend-dot-archive"></span><span>Arsip</span></span>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-amber-200/50 border border-amber-200/40"></span>
-                <span>Arsip Minggu Lalu</span>
-            </div>
-            <div class="text-[9px] text-slate-400 pt-0.5 border-t border-white/10">
-                1 Jari: Putar · 2 Jari / Tombol Pan: Geser ↑↓←→ &amp; Zoom
+            <div class="legend-hint">
+                Satu jari: putar · Dua jari: geser &amp; zoom
             </div>
         </div>
 
@@ -144,7 +140,7 @@
                 <circle cx="19" cy="12.6" r="1.8"/>
                 <path d="M12 10.5c-3.1 0-5.4 2.4-5.4 5.1 0 1.9 1.5 3.1 3.3 3.1 1 0 1.5-.3 2.1-.3s1.1.3 2.1.3c1.8 0 3.3-1.2 3.3-3.1 0-2.7-2.3-5.1-5.4-5.1z"/>
             </svg>
-            <span>+ Add My Achievement</span>
+            <span>Catat pencapaian</span>
         </button>
     </div>
 
@@ -196,11 +192,11 @@
     </div>
 
     <!-- Confirm Achievement Bottom Sheet -->
-    <div id="confirm-sheet" class="hidden fixed inset-x-0 bottom-0 z-40 p-3 sm:p-4 flex justify-center pointer-events-none">
+    <div id="confirm-sheet" class="hidden fixed inset-x-0 bottom-0 z-40 p-3 sm:p-4 flex justify-center pointer-events-none" role="dialog" aria-modal="true" aria-labelledby="confirm-sheet-title">
         <div class="glass-light w-full max-w-md rounded-3xl p-5 text-slate-900 pointer-events-auto">
             <div class="flex items-center justify-between mb-3">
                 <div>
-                    <h2 class="text-base font-extrabold text-slate-900">Catat Pencapaianmu 🐾</h2>
+                    <h2 id="confirm-sheet-title" class="text-base font-extrabold text-slate-900">Catat pencapaianmu</h2>
                     <p id="confirm-coord-info" class="text-[11px] text-slate-500 mt-0.5">Ketinggian: 0.0 m · Tanggal ditentukan otomatis oleh server</p>
                 </div>
                 <button id="confirm-close-x" type="button" class="w-8 h-8 rounded-xl hover:bg-slate-200/70 text-slate-500 flex items-center justify-center font-bold">✕</button>
@@ -210,7 +206,7 @@
                     <label for="input-climber-name" class="block text-xs font-bold text-slate-700 mb-1">
                         Nama Pemanjat <span class="text-rose-500">*</span>
                     </label>
-                    <input id="input-climber-name" type="text" maxlength="32" required autocomplete="off"
+                    <input id="input-climber-name" type="text" maxlength="32" required autocomplete="name" autocapitalize="words"
                         placeholder="Contoh: Bima / Rara"
                         class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
                     <div class="flex justify-between text-[10px] text-slate-400 mt-1">
@@ -225,7 +221,7 @@
                     </button>
                     <button id="confirm-save-btn" type="submit"
                         class="px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-extrabold shadow-md transition">
-                        Save Achievement
+                        Simpan pencapaian
                     </button>
                 </div>
             </form>
@@ -233,10 +229,10 @@
     </div>
 
     <!-- Supabase Connection Diagnostic Modal -->
-    <div id="cloud-diag-modal" class="hidden fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
+    <div id="cloud-diag-modal" class="hidden fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="cloud-diag-title">
         <div class="glass-light w-full max-w-sm rounded-3xl p-5 text-slate-900">
             <div class="flex items-center justify-between mb-3">
-                <h3 class="text-sm font-extrabold text-slate-900">Status Koneksi Cloud Supabase</h3>
+                <h3 id="cloud-diag-title" class="text-sm font-extrabold text-slate-900">Status koneksi Supabase</h3>
                 <button id="cloud-diag-close" type="button" class="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-500 font-bold">✕</button>
             </div>
             <div class="space-y-3 text-xs">
