@@ -1,0 +1,586 @@
+/* 3D Wall Achievement — extracted from index.html; visual rules preserved. */
+* {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at 50% 25%, #1e293b 0%, #0f172a 70%, #020617 100%);
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            touch-action: none;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+        .glass-light {
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+        }
+        .btn-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #f8fafc;
+            transition: transform 0.18s ease, background-color 0.18s ease;
+            cursor: pointer;
+        }
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.16);
+        }
+        .btn-icon:active {
+            transform: scale(0.92);
+        }
+        .btn-icon-active {
+            background: rgba(249, 115, 22, 0.92) !important;
+            color: #0f172a !important;
+            box-shadow: 0 0 14px rgba(249, 115, 22, 0.55);
+        }
+        .btn-refresh:hover svg {
+            transform: rotate(90deg);
+        }
+        .btn-refresh svg {
+            transition: transform 0.3s ease;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+            50% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+        }
+        .cta-glow {
+            animation: pulseGlow 2.4s infinite;
+        }
+        .toast-enter {
+            opacity: 1 !important;
+            transform: translate(-50%, 0) !important;
+        }
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+
+/* ==========================================================================
+   UI polish v1 — calmer surfaces, clearer hierarchy and mobile ergonomics
+   The Three.js scene and its interaction layer remain unchanged.
+   ========================================================================== */
+:root {
+    color-scheme: dark;
+    --ui-border: rgba(226, 232, 240, 0.16);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body {
+    min-height: 100%;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    background: #08111f;
+}
+
+#canvas-container {
+    height: 100dvh;
+    background: radial-gradient(ellipse at 50% 18%, rgba(51, 65, 85, 0.78) 0%, rgba(15, 23, 42, 0.96) 48%, #020617 100%);
+}
+
+.glass-panel {
+    background: linear-gradient(145deg, rgba(15, 27, 46, 0.86), rgba(8, 18, 33, 0.76));
+    border: 1px solid var(--ui-border);
+    box-shadow: 0 14px 34px rgba(2, 6, 23, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+    backdrop-filter: blur(18px) saturate(130%);
+}
+
+.glass-light {
+    background: rgba(250, 250, 249, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    box-shadow: 0 22px 64px rgba(2, 6, 23, 0.42);
+    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: blur(22px);
+}
+
+#wall-header {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    left: max(10px, env(safe-area-inset-left, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    align-items: flex-start;
+}
+
+#wall-header > div:first-child {
+    min-height: 60px;
+}
+
+#camera-toolbar {
+    flex-shrink: 0;
+    gap: 4px;
+    padding: 5px;
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border: 1px solid transparent;
+    border-radius: 13px;
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.025);
+    transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+.btn-icon:focus-visible,
+#wall-bottom-bar button:focus-visible,
+#confirm-sheet button:focus-visible,
+#cloud-diag-modal button:focus-visible,
+#input-climber-name:focus-visible {
+    outline: 3px solid rgba(251, 146, 60, 0.9);
+    outline-offset: 3px;
+}
+
+.btn-icon-active {
+    background: rgba(249, 115, 22, 0.95) !important;
+    border-color: rgba(255, 237, 213, 0.42) !important;
+    color: #111827 !important;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14), 0 8px 20px rgba(249, 115, 22, 0.22);
+}
+
+#cloud-status-btn {
+    min-height: 24px;
+    padding: 3px 9px;
+    letter-spacing: 0.01em;
+}
+
+#wall-bottom-bar {
+    bottom: max(12px, var(--safe-bottom));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.wall-legend {
+    min-width: 190px;
+    padding: 11px 13px;
+    color: #e2e8f0;
+}
+
+.legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px 14px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+
+.legend-dot-current {
+    background: #fb923c;
+    box-shadow: 0 0 10px rgba(251, 146, 60, 0.8);
+}
+
+.legend-dot-archive {
+    background: rgba(253, 230, 138, 0.58);
+    border: 1px solid rgba(253, 230, 138, 0.66);
+}
+
+.legend-hint {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255, 255, 255, 0.11);
+    color: #a9b8ca;
+    font-size: 9px;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+}
+
+#add-achievement-btn {
+    min-height: 48px;
+    padding: 0 17px;
+    border: 1px solid rgba(255, 237, 213, 0.34);
+    border-radius: 16px;
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    color: #111827;
+    box-shadow: 0 12px 28px rgba(194, 65, 12, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    font-size: 12px;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    animation: none;
+}
+
+#add-achievement-btn:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+
+#add-achievement-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+#add-mode-banner {
+    top: max(84px, calc(env(safe-area-inset-top, 0px) + 72px));
+    max-width: calc(100vw - 24px);
+}
+
+#add-mode-banner > div {
+    justify-content: center;
+    max-width: 100%;
+    padding: 10px 14px;
+    border-color: rgba(52, 211, 153, 0.35);
+    background: rgba(3, 48, 39, 0.92);
+    box-shadow: 0 12px 32px rgba(2, 6, 23, 0.32);
+}
+
+#marker-popup,
+#cluster-list-popup {
+    bottom: calc(96px + var(--safe-bottom));
+}
+
+#marker-popup > div,
+#cluster-list-popup > div,
+#confirm-sheet > div,
+#cloud-diag-modal > div {
+    border-radius: 24px;
+}
+
+#confirm-sheet {
+    padding: 12px;
+    padding-bottom: max(12px, var(--safe-bottom));
+    align-items: flex-end;
+    background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.22));
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+
+#confirm-sheet > div {
+    width: min(100%, 480px);
+    max-height: min(78dvh, 620px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px;
+    padding-bottom: max(20px, var(--safe-bottom));
+    border: 1px solid rgba(255, 255, 255, 0.74);
+}
+
+#confirm-sheet-title {
+    font-size: 18px;
+    letter-spacing: -0.025em;
+}
+
+#confirm-coord-info {
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+#input-climber-name {
+    min-height: 48px;
+    border-radius: 13px;
+    font-size: 16px;
+    font-weight: 600;
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: manipulation;
+}
+
+#confirm-form button,
+#cloud-diag-modal button {
+    min-height: 44px;
+}
+
+#confirm-save-btn {
+    min-width: 150px;
+    box-shadow: 0 8px 18px rgba(234, 88, 12, 0.18);
+}
+
+#cloud-diag-modal {
+    padding: 16px;
+    background: rgba(2, 6, 23, 0.72);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+}
+
+#cloud-diag-modal > div {
+    padding: 21px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+#toast {
+    top: max(78px, calc(env(safe-area-inset-top, 0px) + 68px));
+    width: max-content;
+}
+
+#toast-text {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(8, 18, 34, 0.96);
+    border-radius: 14px;
+    padding: 11px 15px;
+    line-height: 1.4;
+    box-shadow: 0 14px 36px rgba(2, 6, 23, 0.34);
+}
+
+@media (max-width: 520px) {
+    #wall-header {
+        gap: 7px;
+    }
+
+    #wall-header > div:first-child {
+        max-width: calc(100% - 51px);
+        min-height: 56px;
+        padding: 9px 10px;
+        gap: 9px;
+    }
+
+    #wall-header > div:first-child > div:first-child {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+    }
+
+    #wall-header h1 {
+        font-size: 11px;
+    }
+
+    #wall-header > div:first-child > div:last-child > div:last-child {
+        font-size: 9px;
+    }
+
+    #camera-toolbar {
+        flex-direction: column;
+        gap: 3px;
+        padding: 4px;
+        border-radius: 15px;
+    }
+
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+    }
+
+    .btn-icon svg {
+        width: 17px;
+        height: 17px;
+    }
+
+    #wall-bottom-bar {
+        left: 10px;
+        right: 10px;
+        bottom: max(10px, var(--safe-bottom));
+        gap: 8px;
+    }
+
+    .wall-legend {
+        min-width: 0;
+        flex: 1 1 auto;
+        padding: 10px 11px;
+        border-radius: 15px;
+    }
+
+    .legend-items {
+        gap: 6px 10px;
+    }
+
+    .legend-item {
+        gap: 6px;
+        font-size: 9px;
+    }
+
+    .legend-dot {
+        width: 8px;
+        height: 8px;
+    }
+
+    .legend-hint {
+        margin-top: 6px;
+        padding-top: 6px;
+        font-size: 8px;
+    }
+
+    #add-achievement-btn {
+        min-height: 46px;
+        max-width: 46%;
+        padding: 0 12px;
+        gap: 7px;
+        border-radius: 15px;
+        font-size: 11px;
+    }
+
+    #add-achievement-btn svg {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+    }
+
+    #add-mode-banner {
+        top: max(82px, calc(env(safe-area-inset-top, 0px) + 68px));
+        width: calc(100vw - 20px);
+    }
+
+    #add-mode-banner > div {
+        gap: 8px;
+        padding: 9px 11px;
+        font-size: 10px;
+        white-space: normal;
+    }
+
+    #add-mode-banner > div > span:nth-child(2) {
+        flex: 1 1 auto;
+        line-height: 1.35;
+    }
+
+    #confirm-sheet {
+        padding: 8px;
+        padding-bottom: max(8px, var(--safe-bottom));
+    }
+
+    #confirm-sheet > div {
+        max-height: min(82dvh, 620px);
+        padding: 18px;
+        padding-bottom: max(18px, var(--safe-bottom));
+        border-radius: 23px;
+    }
+
+    #confirm-form > div:last-child {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+    }
+
+    #confirm-form > div:last-child button {
+        min-height: 46px;
+        padding-inline: 10px;
+    }
+
+    #confirm-save-btn {
+        min-width: 0;
+    }
+
+    #marker-popup,
+    #cluster-list-popup {
+        bottom: calc(88px + var(--safe-bottom));
+    }
+}
+
+@media (max-width: 360px) {
+    #wall-header h1 {
+        max-width: 125px;
+    }
+
+    #cloud-status-btn {
+        padding-inline: 6px;
+        font-size: 9px;
+    }
+
+    .legend-hint {
+        display: none;
+    }
+
+    #add-achievement-btn {
+        max-width: 48%;
+        padding-inline: 9px;
+        font-size: 10px;
+    }
+}
+
+@media (min-width: 900px) {
+    #wall-header {
+        top: 18px;
+        left: 18px;
+        right: 18px;
+    }
+
+    #wall-bottom-bar {
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+    }
+
+    #camera-toolbar {
+        flex-direction: row;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+
+/* Keep the header toolbar and title card from colliding on compact tablets. */
+@media (min-width: 640px) and (max-width: 899px) {
+    #wall-header {
+        gap: 8px;
+    }
+
+    #wall-header > div:first-child {
+        max-width: calc(100% - 198px);
+    }
+
+    #camera-toolbar {
+        flex-direction: row;
+    }
+
+    #camera-toolbar .btn-icon {
+        width: 36px;
+        height: 36px;
+    }
+}
