@@ -521,14 +521,14 @@ import { createScene3D } from './scene3d.js';
                     const cnt = document.getElementById('name-char-count');
                     if (cnt) cnt.textContent = '0/32';
                     exitAddMode();
-                    showToast('🐾 Cat paw berhasil tersimpan di 3D Wall!');
+                    showToast('Pencapaian berhasil disimpan di 3D Wall.');
                 } catch (err) {
                     console.warn('Save marker error:', err);
                     showToast(err && err.message ? err.message : 'Gagal menyimpan marker.');
                 } finally {
                     if (saveBtn) {
                         saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save Achievement';
+                        saveBtn.textContent = 'Simpan pencapaian';
                     }
                 }
             });
