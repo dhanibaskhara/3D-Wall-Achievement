@@ -260,8 +260,8 @@ export function createMarkerRenderer(appState, deps) {
         }
 
         function getClusterRadiusForCamera() {
-            if (!camSpherical) return 0;
-            const d = camSpherical.radius;
+            if (!appState.camSpherical) return 0;
+            const d = appState.camSpherical.radius;
             if (d > 24) return 0.72;
             if (d > 16) return 0.42;
             if (d > 10.5) return 0.22;
