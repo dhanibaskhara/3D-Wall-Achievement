@@ -1418,7 +1418,8 @@ export function createScene3D(appState, deps) {
                 });
             }
 
-            cart.position.set(4.05, 0, 0.85);
+            // Sisakan koridor yang jelas antara ujung wall biru dan gerobak.
+            cart.position.set(5.00, 0, 0.85);
             cart.rotation.y = -0.12;
             return { group: cart, steam };
         }
@@ -1435,6 +1436,8 @@ export function createScene3D(appState, deps) {
                 hanger: null,
                 coffeeSteam: [],
                 baksoSteam: [],
+                baksoVendor: null,
+                baksoDiners: [],
                 cats: [],
                 chalkPuffs: []
             };
@@ -1442,6 +1445,122 @@ export function createScene3D(appState, deps) {
             const baksoCart = buildBaksoCart();
             group.add(baksoCart.group);
             actors.baksoSteam = baksoCart.steam;
+
+            // Penjual berdiri di sisi kanan-belakang gerobak, dengan apron dan alat saji.
+            const vendor = createStylizedPerson({
+                shirt: 0xf8fafc, pants: 0x1f2937, shoe: 0x292524,
+                skin: 0xd9a477, hair: 0x292018, capColor: 0xf8fafc
+            });
+            vendor.root.position.set(6.32, 0, -0.05);
+            vendor.root.rotation.y = -Math.PI / 2;
+            const apronMat = new deps.THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.86 });
+            const apron = new deps.THREE.Mesh(new deps.THREE.BoxGeometry(0.30, 0.35, 0.035), apronMat);
+            apron.position.set(0, 0.19, 0.112);
+            vendor.torso.add(apron);
+            const apronPocket = new deps.THREE.Mesh(
+                new deps.THREE.BoxGeometry(0.13, 0.075, 0.012),
+                new deps.THREE.MeshStandardMaterial({ color: 0xfde6c4, roughness: 0.88 })
+            );
+            apronPocket.position.set(0, 0.09, 0.135);
+            vendor.torso.add(apronPocket);
+
+            vendor.leftArm.shoulder.rotation.set(-0.75, 0.10, 0.14);
+            vendor.leftArm.elbow.rotation.set(-0.85, 0, 0);
+            vendor.rightArm.shoulder.rotation.set(-0.95, -0.12, -0.16);
+            vendor.rightArm.elbow.rotation.set(-0.72, 0, 0);
+            const ladleHandle = new deps.THREE.Mesh(
+                new deps.THREE.CylinderGeometry(0.012, 0.012, 0.24, 7),
+                new deps.THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.72, roughness: 0.38 })
+            );
+            ladleHandle.rotation.x = -0.35;
+            ladleHandle.position.set(0, -0.07, 0.025);
+            vendor.rightArm.hand.add(ladleHandle);
+            const ladleBowl = new deps.THREE.Mesh(
+                new deps.THREE.SphereGeometry(0.055, 10, 8),
+                new deps.THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.78, roughness: 0.32 })
+            );
+            ladleBowl.scale.set(1, 0.32, 1);
+            ladleBowl.position.set(0, -0.19, 0.06);
+            vendor.rightArm.hand.add(ladleBowl);
+            group.add(vendor.root);
+            actors.baksoVendor = vendor;
+
+            // Dua pelanggan duduk di bangku kecil sambil menyantap semangkuk bakso.
+            const stoolWood = new deps.THREE.MeshStandardMaterial({ color: 0x85552f, roughness: 0.88 });
+            const stoolMetal = new deps.THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.62, roughness: 0.55 });
+            const buildBaksoStool = (x, z) => {
+                const seat = new deps.THREE.Mesh(
+                    new deps.THREE.CylinderGeometry(0.25, 0.23, 0.085, 16),
+                    stoolWood
+                );
+                seat.position.set(x, 0.49, z);
+                seat.castShadow = true;
+                seat.receiveShadow = true;
+                group.add(seat);
+
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i / 3) * Math.PI * 2;
+                    const leg = new deps.THREE.Mesh(
+                        new deps.THREE.CylinderGeometry(0.018, 0.024, 0.46, 7),
+                        stoolMetal
+                    );
+                    leg.position.set(x + Math.cos(angle) * 0.17, 0.245, z + Math.sin(angle) * 0.17);
+                    leg.castShadow = true;
+                    group.add(leg);
+                }
+            };
+
+            const diners = [
+                { x: 4.12, z: 3.10, shirt: 0x2563eb, pants: 0x1e293b, skin: 0xe0ac82, hair: 0x211b18, phase: 0.4 },
+                { x: 5.78, z: 3.18, shirt: 0x16a34a, pants: 0x334155, skin: 0xc98e64, hair: 0x292018, capColor: 0x1e293b, phase: 2.1 }
+            ];
+            diners.forEach((cfg) => {
+                buildBaksoStool(cfg.x, cfg.z);
+                const diner = createStylizedPerson({
+                    shirt: cfg.shirt, pants: cfg.pants, shoe: 0x292524,
+                    skin: cfg.skin, hair: cfg.hair, capColor: cfg.capColor
+                });
+                diner.root.position.set(cfg.x, 0, cfg.z);
+                diner.root.rotation.y = Math.PI;
+                diner.pelvis.position.y = 0.53;
+                diner.leftLeg.hip.rotation.set(-1.30, 0.22, -0.12);
+                diner.leftLeg.knee.rotation.set(1.82, 0, 0);
+                diner.rightLeg.hip.rotation.set(-1.30, -0.22, 0.12);
+                diner.rightLeg.knee.rotation.set(1.82, 0, 0);
+                diner.torso.rotation.x = 0.10;
+                diner.headGroup.rotation.x = -0.18;
+                diner.leftArm.shoulder.rotation.set(-0.72, 0.14, 0.10);
+                diner.leftArm.elbow.rotation.set(-0.92, 0, 0);
+                diner.rightArm.shoulder.rotation.set(-0.82, -0.14, -0.10);
+                diner.rightArm.elbow.rotation.set(-0.96, 0, 0);
+
+                // Mangkuk putih dengan kuah dan bakso kecil di tangan pelanggan.
+                const bowlGroup = new deps.THREE.Group();
+                bowlGroup.position.set(0, -0.015, 0.045);
+                const bowl = new deps.THREE.Mesh(
+                    new deps.THREE.CylinderGeometry(0.09, 0.065, 0.055, 12),
+                    new deps.THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.38 })
+                );
+                bowl.position.y = -0.012;
+                bowlGroup.add(bowl);
+                const broth = new deps.THREE.Mesh(
+                    new deps.THREE.CircleGeometry(0.072, 12),
+                    new deps.THREE.MeshStandardMaterial({ color: 0xd6b778, roughness: 0.42 })
+                );
+                broth.rotation.x = -Math.PI / 2;
+                broth.position.y = 0.017;
+                bowlGroup.add(broth);
+                const meatball = new deps.THREE.Mesh(
+                    new deps.THREE.SphereGeometry(0.027, 8, 7),
+                    new deps.THREE.MeshStandardMaterial({ color: 0x9b8068, roughness: 0.82 })
+                );
+                meatball.position.set(0.025, 0.034, 0.015);
+                bowlGroup.add(meatball);
+                diner.rightArm.hand.add(bowlGroup);
+
+                group.add(diner.root);
+                actors.baksoDiners.push({ person: diner, phase: cfg.phase });
+            });
 
             // Pohon rindang hanya di sebelah kiri wall
             actors.treeCrown = buildLeftTreeOnly();
@@ -1934,6 +2053,28 @@ export function createScene3D(appState, deps) {
                 );
                 st.mesh.scale.setScalar(0.55 + cycle * 1.25);
                 st.mat.opacity = (1 - cycle) * 0.34;
+            }
+
+            // Gerakan kecil penjual saat melayani pelanggan.
+            if (appState.livingActors.baksoVendor) {
+                const vendor = appState.livingActors.baksoVendor;
+                vendor.headGroup.rotation.x = -0.08 + Math.sin(sec * 1.1) * 0.07;
+                vendor.headGroup.rotation.y = Math.sin(sec * 0.65) * 0.10;
+                const serveMotion = Math.sin(sec * 1.35);
+                vendor.rightArm.shoulder.rotation.set(-0.95 + serveMotion * 0.10, -0.12, -0.16);
+                vendor.rightArm.elbow.rotation.x = -0.72 - Math.max(0, serveMotion) * 0.12;
+            }
+
+            // Pelanggan bergantian mengangkat mangkuk dan menunduk menyantap bakso.
+            for (let i = 0; i < appState.livingActors.baksoDiners.length; i++) {
+                const item = appState.livingActors.baksoDiners[i];
+                const person = item.person;
+                const eating = Math.max(0, Math.sin(sec * 1.25 + item.phase));
+                person.headGroup.rotation.x = -0.18 - eating * 0.18;
+                person.headGroup.rotation.y = Math.sin(sec * 0.55 + item.phase) * 0.07;
+                person.rightArm.shoulder.rotation.set(-0.82 - eating * 0.20, -0.14, -0.10);
+                person.rightArm.elbow.rotation.x = -0.96 - eating * 0.18;
+                person.leftArm.shoulder.rotation.x = -0.72 + eating * 0.06;
             }
 
             // 4. Animasi kucing wara-wiri di bawah wall
