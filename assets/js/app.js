@@ -130,7 +130,7 @@ import { createScene3D } from './scene3d.js';
             sharedPawAssets: { get: () => sharedPawAssets, set: (value) => { sharedPawAssets = value; } }
         });
         const markerService = createMarkerRenderer(markerState, {
-            get THREE() { return window.THREE; }, sceneService.snapPointToWallSurface
+            get THREE() { return window.THREE; }, snapPointToWallSurface: sceneService.snapPointToWallSurface
         });
 
         const supabaseState = {};
