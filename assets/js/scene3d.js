@@ -299,8 +299,11 @@ export function createScene3D(appState, deps) {
             canopy.position.set(deps.RIGHT_CENTER_X + 2.15, 11.4, 0.35);
             canopy.rotation.z = -0.14;
             group.add(canopy);
-            addStrut(group, new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 1.45, 9.8, 0.9), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, 0.9), 0.035, steelMat);
-            addStrut(group, new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 1.45, 9.8, -0.3), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, -0.3), 0.035, steelMat);
+            // Penyangga kanopi dimulai di luar sisi kanan panel wall biru,
+            // sehingga tidak memotong atau menembus bidang climbing wall.
+            const canopySideMountX = deps.RIGHT_CENTER_X + deps.WALL_WIDTH / 2 + 0.07;
+            addStrut(group, new deps.THREE.Vector3(canopySideMountX, 9.8, 0.9), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, 0.9), 0.032, steelMat);
+            addStrut(group, new deps.THREE.Vector3(canopySideMountX, 9.8, -0.3), new deps.THREE.Vector3(deps.RIGHT_CENTER_X + 2.8, 11.2, -0.3), 0.032, steelMat);
 
             appState.scene.add(group);
         }
@@ -1791,64 +1794,70 @@ export function createScene3D(appState, deps) {
             const barMat = new deps.THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.4, metalness: 0.65 });
             const steelMat = new deps.THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.55, metalness: 0.75 });
 
-            const hangBarX = deps.RIGHT_CENTER_X + 2.45;
+            const hangBarX = deps.RIGHT_CENTER_X + 2.15;
             const hangBarY = 10.85;
             const hangBarZ = 0.42;
+            const hangBarCenterZ = 0.30;
 
-            // Bracket kantilever mengikat area monkey-bar langsung ke kolom luar
-            // rangka tower wall biru (bukan tiang berdiri terpisah).
-            const rightFrameX = deps.RIGHT_CENTER_X + 1.35;
-            const rightFrameFrontZ = getWallSurfaceAtY(deps.rightProfile, hangBarY).z - 0.28;
-            const rightFrameBackZ = -1.9;
+            // Semua penyangga berada di luar sisi kanan wall biru.
+            // Plat hanya menempel pada sisi panel; tidak ada balok yang melintas
+            // di belakang bidang wall dari rangka depan ke rangka belakang.
+            const wallOuterX = deps.RIGHT_CENTER_X + deps.WALL_WIDTH / 2;
+            const sidePlateX = wallOuterX + 0.035;
+            const bracketStartX = wallOuterX + 0.07;
             const supportNodes = [
-                { frameZ: rightFrameBackZ, barZ: -0.30, lowerZ: -0.30 },
-                { frameZ: rightFrameFrontZ, barZ: 0.90, lowerZ: 0.90 }
+                { z: -0.24 },
+                { z: 0.84 }
             ];
+            const plateMat = new deps.THREE.MeshStandardMaterial({
+                color: 0x64748b, roughness: 0.48, metalness: 0.82
+            });
 
             supportNodes.forEach((node) => {
-                // Balok horizontal terhubung ke kolom rangka biru dan dudukan bar.
+                // Plat dudukan vertikal menempel rata pada sisi luar wall.
+                const sideMount = new deps.THREE.Mesh(
+                    new deps.THREE.BoxGeometry(0.07, 0.92, 0.18), plateMat
+                );
+                sideMount.position.set(sidePlateX, hangBarY - 0.42, node.z);
+                upperCanopyGroup.add(sideMount);
+
+                // Lengan horizontal pendek sebagai dudukan palang gantung.
                 addStrut(
                     upperCanopyGroup,
-                    new deps.THREE.Vector3(rightFrameX, hangBarY, node.frameZ),
-                    new deps.THREE.Vector3(hangBarX, hangBarY, node.barZ),
-                    0.055,
+                    new deps.THREE.Vector3(bracketStartX, hangBarY, node.z),
+                    new deps.THREE.Vector3(hangBarX, hangBarY, node.z),
+                    0.043,
                     steelMat
                 );
 
-                // Pengaku diagonal menyalurkan beban ke simpul rangka bawah.
+                // Pengaku diagonal membentuk segitiga kantilever yang proporsional.
                 addStrut(
                     upperCanopyGroup,
-                    new deps.THREE.Vector3(rightFrameX, 9.8, node.frameZ),
-                    new deps.THREE.Vector3(hangBarX, hangBarY, node.barZ),
-                    0.042,
+                    new deps.THREE.Vector3(bracketStartX, hangBarY - 0.70, node.z),
+                    new deps.THREE.Vector3(hangBarX, hangBarY, node.z),
+                    0.034,
                     steelMat
                 );
-
-                // Plat sambungan pada kolom rangka dan ujung bracket.
-                const plateMat = new deps.THREE.MeshStandardMaterial({
-                    color: 0x64748b, roughness: 0.48, metalness: 0.82
-                });
-                const framePlate = new deps.THREE.Mesh(
-                    new deps.THREE.BoxGeometry(0.13, 0.22, 0.16), plateMat
-                );
-                framePlate.position.set(rightFrameX, hangBarY, node.frameZ);
-                upperCanopyGroup.add(framePlate);
 
                 const endPlate = new deps.THREE.Mesh(
-                    new deps.THREE.BoxGeometry(0.16, 0.10, 0.16), plateMat
+                    new deps.THREE.BoxGeometry(0.13, 0.10, 0.14), plateMat
                 );
-                endPlate.position.set(hangBarX, hangBarY, node.barZ);
+                endPlate.position.set(hangBarX, hangBarY, node.z);
                 upperCanopyGroup.add(endPlate);
             });
 
-            const hangBar = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.028, 0.028, 1.55, 10), barMat);
+            const hangBar = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.026, 0.026, 1.28, 10), barMat);
             hangBar.rotation.x = Math.PI / 2;
-            hangBar.position.set(hangBarX, hangBarY, 0.30);
+            hangBar.position.set(hangBarX, hangBarY, hangBarCenterZ);
             upperCanopyGroup.add(hangBar);
 
-            [-0.30, 0.90].forEach((gz) => {
-                const rod = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.02, 0.02, 0.46, 8), steelMat);
-                rod.position.set(hangBarX, hangBarY + 0.23, gz);
+            // Gantungan pendek menghubungkan palang ke kanopi, bukan ke bidang wall.
+            supportNodes.forEach((node) => {
+                const rod = new deps.THREE.Mesh(
+                    new deps.THREE.CylinderGeometry(0.016, 0.016, 0.46, 8),
+                    steelMat
+                );
+                rod.position.set(hangBarX, hangBarY + 0.23, node.z);
                 upperCanopyGroup.add(rod);
             });
 
