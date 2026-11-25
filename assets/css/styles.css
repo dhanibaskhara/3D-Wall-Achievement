@@ -563,3 +563,24 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+
+/* Keep the header toolbar and title card from colliding on compact tablets. */
+@media (min-width: 640px) and (max-width: 899px) {
+    #wall-header {
+        gap: 8px;
+    }
+
+    #wall-header > div:first-child {
+        max-width: calc(100% - 198px);
+    }
+
+    #camera-toolbar {
+        flex-direction: row;
+    }
+
+    #camera-toolbar .btn-icon {
+        width: 36px;
+        height: 36px;
+    }
+}
