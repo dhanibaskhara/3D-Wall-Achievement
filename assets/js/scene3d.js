@@ -1795,6 +1795,52 @@ export function createScene3D(appState, deps) {
             const hangBarY = 10.85;
             const hangBarZ = 0.42;
 
+            // Bracket kantilever mengikat area monkey-bar langsung ke kolom luar
+            // rangka tower wall biru (bukan tiang berdiri terpisah).
+            const rightFrameX = deps.RIGHT_CENTER_X + 1.35;
+            const rightFrameFrontZ = getWallSurfaceAtY(deps.rightProfile, hangBarY).z - 0.28;
+            const rightFrameBackZ = -1.9;
+            const supportNodes = [
+                { frameZ: rightFrameBackZ, barZ: -0.30, lowerZ: -0.30 },
+                { frameZ: rightFrameFrontZ, barZ: 0.90, lowerZ: 0.90 }
+            ];
+
+            supportNodes.forEach((node) => {
+                // Balok horizontal terhubung ke kolom rangka biru dan dudukan bar.
+                addStrut(
+                    upperCanopyGroup,
+                    new deps.THREE.Vector3(rightFrameX, hangBarY, node.frameZ),
+                    new deps.THREE.Vector3(hangBarX, hangBarY, node.barZ),
+                    0.055,
+                    steelMat
+                );
+
+                // Pengaku diagonal menyalurkan beban ke simpul rangka bawah.
+                addStrut(
+                    upperCanopyGroup,
+                    new deps.THREE.Vector3(rightFrameX, 9.8, node.frameZ),
+                    new deps.THREE.Vector3(hangBarX, hangBarY, node.barZ),
+                    0.042,
+                    steelMat
+                );
+
+                // Plat sambungan pada kolom rangka dan ujung bracket.
+                const plateMat = new deps.THREE.MeshStandardMaterial({
+                    color: 0x64748b, roughness: 0.48, metalness: 0.82
+                });
+                const framePlate = new deps.THREE.Mesh(
+                    new deps.THREE.BoxGeometry(0.13, 0.22, 0.16), plateMat
+                );
+                framePlate.position.set(rightFrameX, hangBarY, node.frameZ);
+                upperCanopyGroup.add(framePlate);
+
+                const endPlate = new deps.THREE.Mesh(
+                    new deps.THREE.BoxGeometry(0.16, 0.10, 0.16), plateMat
+                );
+                endPlate.position.set(hangBarX, hangBarY, node.barZ);
+                upperCanopyGroup.add(endPlate);
+            });
+
             const hangBar = new deps.THREE.Mesh(new deps.THREE.CylinderGeometry(0.028, 0.028, 1.55, 10), barMat);
             hangBar.rotation.x = Math.PI / 2;
             hangBar.position.set(hangBarX, hangBarY, 0.30);
