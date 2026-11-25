@@ -50,11 +50,11 @@
                     <button id="cloud-status-btn" type="button" title="Klik untuk cek detail koneksi Supabase"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-200 border border-amber-400/30 hover:bg-amber-500/30 transition cursor-pointer">
                         <span id="cloud-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                        <span id="cloud-status-text">Menghubungkan...</span>
+                        <span id="cloud-status-text" aria-live="polite">Menghubungkan...</span>
                     </button>
                 </div>
                 <div class="text-[10px] sm:text-[11px] text-slate-300 truncate mt-0.5">
-                    Pasar Festival 3D Wall · <span id="marker-count-label" class="text-orange-300 font-semibold">0 paw</span>
+                    Pasar Festival 3D Wall · <span id="marker-count-label" class="text-orange-300 font-semibold" aria-live="polite">0 paw</span>
                     <span id="week-badge-label" class="text-slate-400"></span>
                 </div>
             </div>
@@ -106,7 +106,7 @@
     </header>
 
     <!-- Add Mode Instruction Banner -->
-    <div id="add-mode-banner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+    <div id="add-mode-banner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-auto" role="status" aria-live="polite">
         <div class="glass-panel rounded-full px-4 py-2 flex items-center gap-3 border-emerald-400/50 bg-emerald-950/80 text-emerald-100 text-xs font-semibold shadow-xl whitespace-nowrap">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             <span>Pilih posisi tertinggi yang berhasil kamu capai</span>
@@ -274,7 +274,7 @@
     <!-- Toast Notification -->
     <div id="toast"
         class="fixed top-20 left-1/2 -translate-x-1/2 -translate-y-3 opacity-0 pointer-events-none z-50 transition-all duration-300 max-w-[90vw]">
-        <div id="toast-text"
+        <div id="toast-text" role="status" aria-live="polite"
             class="px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-white/15 text-white text-xs font-semibold shadow-2xl text-center">
         </div>
     </div>
