@@ -125,7 +125,7 @@ import { createMarkerRenderer } from './markers.js';
             selectedMarker: { get: () => selectedMarker, set: (value) => { selectedMarker = value; } },
             lastCloudDiag: { get: () => lastCloudDiag, set: (value) => { lastCloudDiag = value; } }
         });
-        const supabaseService = createSupabaseService(supabaseState, { SUPABASE_URL, SUPABASE_KEY, createResilientStorage, formatDateIndo, generateUuidV4, showToast, markerService.rebuildMarkers3D, closeMarkerPopup });
+        const supabaseService = createSupabaseService(supabaseState, { SUPABASE_URL, SUPABASE_KEY, createResilientStorage, formatDateIndo, generateUuidV4, showToast, rebuildMarkers3D: markerService.rebuildMarkers3D, closeMarkerPopup });
         const cameraState = {};
         Object.defineProperties(cameraState, {
             camera: { get: () => camera, set: (value) => { camera = value; } },
