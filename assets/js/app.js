@@ -448,6 +448,36 @@ import { createScene3D } from './scene3d.js';
             on('cloud-status-btn', 'click', supabaseService.openCloudDiagModal);
             on('cloud-diag-close', 'click', supabaseService.closeCloudDiagModal);
             on('cloud-diag-ok', 'click', supabaseService.closeCloudDiagModal);
+
+            // Keyboard escape closes the top-most transient surface without changing the 3D scene.
+            window.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+
+                const confirmSheet = document.getElementById('confirm-sheet');
+                if (confirmSheet && !confirmSheet.classList.contains('hidden')) {
+                    exitAddMode();
+                    const addButton = document.getElementById('add-achievement-btn');
+                    if (addButton) addButton.focus();
+                    return;
+                }
+
+                const cloudModal = document.getElementById('cloud-diag-modal');
+                if (cloudModal && !cloudModal.classList.contains('hidden')) {
+                    supabaseService.closeCloudDiagModal();
+                    const statusButton = document.getElementById('cloud-status-btn');
+                    if (statusButton) statusButton.focus();
+                    return;
+                }
+
+                const clusterPopup = document.getElementById('cluster-list-popup');
+                if (clusterPopup && !clusterPopup.classList.contains('hidden')) {
+                    closeClusterListPopup();
+                    return;
+                }
+
+                closeMarkerPopup();
+            });
+
             on('cloud-diag-retry', 'click', async () => {
                 const btn = document.getElementById('cloud-diag-retry');
                 if (btn) {
