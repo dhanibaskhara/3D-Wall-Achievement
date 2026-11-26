@@ -1568,6 +1568,140 @@ export function createScene3D(appState, deps) {
             // Pohon rindang hanya di sebelah kiri wall
             actors.treeCrown = buildLeftTreeOnly();
 
+            // Papan identitas 3D Iyalagi.Manjat di bawah kanopi pohon.
+            // Diletakkan di sisi kiri area, terpisah dari climbing wall dan jalur aktivitas.
+            const buildIyalagiSignboard = () => {
+                const sign = new deps.THREE.Group();
+                const frameMat = new deps.THREE.MeshStandardMaterial({
+                    color: 0x123d24, roughness: 0.48, metalness: 0.28
+                });
+                const edgeMat = new deps.THREE.MeshStandardMaterial({
+                    color: 0x8aa58c, roughness: 0.42, metalness: 0.52
+                });
+                const postMat = new deps.THREE.MeshStandardMaterial({
+                    color: 0x3b4540, roughness: 0.58, metalness: 0.72
+                });
+
+                // Panel utama dengan sudut membulat secara visual melalui lis tebal.
+                const panel = new deps.THREE.Mesh(
+                    new deps.THREE.BoxGeometry(3.35, 1.82, 0.16), frameMat
+                );
+                panel.position.y = 2.28;
+                panel.castShadow = true;
+                panel.receiveShadow = true;
+                sign.add(panel);
+
+                const faceCanvas = document.createElement('canvas');
+                faceCanvas.width = 1200;
+                faceCanvas.height = 650;
+                const ctx = faceCanvas.getContext('2d');
+
+                const bg = ctx.createLinearGradient(0, 0, 1200, 650);
+                bg.addColorStop(0, '#092719');
+                bg.addColorStop(0.55, '#0e3a23');
+                bg.addColorStop(1, '#061d13');
+                ctx.fillStyle = bg;
+                ctx.fillRect(0, 0, 1200, 650);
+
+                // Bingkai tipis dan aksen sudut.
+                ctx.strokeStyle = 'rgba(218, 239, 218, 0.75)';
+                ctx.lineWidth = 12;
+                ctx.strokeRect(22, 22, 1156, 606);
+                ctx.strokeStyle = 'rgba(141, 190, 145, 0.65)';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(42, 42, 1116, 566);
+
+                // Logo wordmark bergaya handwritten, mempertahankan nama brand.
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,0.28)';
+                ctx.shadowBlur = 18;
+                ctx.fillStyle = '#a8e6ad';
+                ctx.font = 'italic 700 112px "Trebuchet MS", cursive';
+                ctx.fillText('iyalagi.manjat', 600, 292, 1050);
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#e7f5e8';
+                ctx.font = '600 34px Arial, sans-serif';
+                ctx.letterSpacing = '12px';
+                ctx.fillText('CLIMBING COMMUNITY', 600, 430);
+
+                // Siluet kucing melompat sebagai aksen maskot.
+                ctx.save();
+                ctx.translate(600, 520);
+                ctx.strokeStyle = '#d9f2dc';
+                ctx.fillStyle = '#d9f2dc';
+                ctx.lineWidth = 15;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-130, 28);
+                ctx.quadraticCurveTo(-215, -52, -170, -104);
+                ctx.quadraticCurveTo(-130, -150, -95, -104);
+                ctx.quadraticCurveTo(-25, -35, 45, -55);
+                ctx.quadraticCurveTo(105, -75, 155, -145);
+                ctx.quadraticCurveTo(172, -165, 188, -145);
+                ctx.quadraticCurveTo(205, -120, 170, -80);
+                ctx.quadraticCurveTo(110, 8, 35, 5);
+                ctx.quadraticCurveTo(-40, 18, -85, 60);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(160, -158, 34, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                const logoTexture = new deps.THREE.CanvasTexture(faceCanvas);
+                logoTexture.encoding = deps.THREE.sRGBEncoding;
+                logoTexture.anisotropy = 4;
+                const face = new deps.THREE.Mesh(
+                    new deps.THREE.PlaneGeometry(3.17, 1.64),
+                    new deps.THREE.MeshBasicMaterial({ map: logoTexture })
+                );
+                face.position.set(0, 2.28, 0.087);
+                sign.add(face);
+
+                // Lis metalik di tepi atas dan bawah.
+                for (const y of [3.19, 1.37]) {
+                    const rail = new deps.THREE.Mesh(
+                        new deps.THREE.BoxGeometry(3.43, 0.055, 0.21), edgeMat
+                    );
+                    rail.position.set(0, y, 0);
+                    rail.castShadow = true;
+                    sign.add(rail);
+                }
+
+                // Dua tiang kokoh dengan alas yang menapak lantai.
+                for (const x of [-1.25, 1.25]) {
+                    const post = new deps.THREE.Mesh(
+                        new deps.THREE.BoxGeometry(0.12, 1.55, 0.14), postMat
+                    );
+                    post.position.set(x, 0.78, -0.015);
+                    post.castShadow = true;
+                    post.receiveShadow = true;
+                    sign.add(post);
+
+                    const foot = new deps.THREE.Mesh(
+                        new deps.THREE.BoxGeometry(0.48, 0.10, 0.42), postMat
+                    );
+                    foot.position.set(x, 0.055, 0.02);
+                    foot.castShadow = true;
+                    sign.add(foot);
+
+                    const bolt = new deps.THREE.Mesh(
+                        new deps.THREE.CylinderGeometry(0.035, 0.035, 0.025, 12),
+                        edgeMat
+                    );
+                    bolt.rotation.x = Math.PI / 2;
+                    bolt.position.set(x, 2.82, 0.11);
+                    sign.add(bolt);
+                }
+
+                // Penempatan di bawah tajuk pohon kiri; sisi depan menghadap area pengunjung.
+                sign.position.set(-6.35, 0, 1.95);
+                sign.rotation.y = -0.04;
+                group.add(sign);
+            };
+            buildIyalagiSignboard();
+
             // -----------------------------------------------------------------
             // A. ORANG-ORANG PREPARE MANJAT DI BAWAH WALL (CHALK-UP, IKAT TALI, BETA)
             // -----------------------------------------------------------------
