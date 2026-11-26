@@ -1584,9 +1584,9 @@ export function createScene3D(appState, deps) {
 
                 // Panel utama dengan sudut membulat secara visual melalui lis tebal.
                 const panel = new deps.THREE.Mesh(
-                    new deps.THREE.BoxGeometry(3.35, 1.82, 0.16), frameMat
+                    new deps.THREE.BoxGeometry(2.60, 1.34, 0.16), frameMat
                 );
-                panel.position.y = 2.28;
+                panel.position.y = 2.12;
                 panel.castShadow = true;
                 panel.receiveShadow = true;
                 sign.add(panel);
@@ -1616,16 +1616,16 @@ export function createScene3D(appState, deps) {
                 logoTexture.encoding = deps.THREE.sRGBEncoding;
                 logoTexture.anisotropy = 4;
                 const face = new deps.THREE.Mesh(
-                    new deps.THREE.PlaneGeometry(3.17, 1.64),
+                    new deps.THREE.PlaneGeometry(2.44, 1.20),
                     new deps.THREE.MeshBasicMaterial({ map: logoTexture })
                 );
-                face.position.set(0, 2.28, 0.087);
+                face.position.set(0, 2.12, 0.087);
                 sign.add(face);
 
                 // Lis metalik di tepi atas dan bawah.
-                for (const y of [3.19, 1.37]) {
+                for (const y of [2.79, 1.45]) {
                     const rail = new deps.THREE.Mesh(
-                        new deps.THREE.BoxGeometry(3.43, 0.055, 0.21), edgeMat
+                        new deps.THREE.BoxGeometry(2.68, 0.045, 0.20), edgeMat
                     );
                     rail.position.set(0, y, 0);
                     rail.castShadow = true;
@@ -1633,19 +1633,19 @@ export function createScene3D(appState, deps) {
                 }
 
                 // Dua tiang kokoh dengan alas yang menapak lantai.
-                for (const x of [-1.25, 1.25]) {
+                for (const x of [-0.94, 0.94]) {
                     const post = new deps.THREE.Mesh(
-                        new deps.THREE.BoxGeometry(0.12, 1.55, 0.14), postMat
+                        new deps.THREE.BoxGeometry(0.10, 1.48, 0.12), postMat
                     );
-                    post.position.set(x, 0.78, -0.015);
+                    post.position.set(x, 0.74, -0.015);
                     post.castShadow = true;
                     post.receiveShadow = true;
                     sign.add(post);
 
                     const foot = new deps.THREE.Mesh(
-                        new deps.THREE.BoxGeometry(0.48, 0.10, 0.42), postMat
+                        new deps.THREE.BoxGeometry(0.38, 0.09, 0.34), postMat
                     );
-                    foot.position.set(x, 0.055, 0.02);
+                    foot.position.set(x, 0.05, 0.02);
                     foot.castShadow = true;
                     sign.add(foot);
 
@@ -1654,7 +1654,7 @@ export function createScene3D(appState, deps) {
                         edgeMat
                     );
                     bolt.rotation.x = Math.PI / 2;
-                    bolt.position.set(x, 2.82, 0.11);
+                    bolt.position.set(x, 2.62, 0.11);
                     sign.add(bolt);
                 }
 
