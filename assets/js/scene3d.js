@@ -1591,63 +1591,26 @@ export function createScene3D(appState, deps) {
                 panel.receiveShadow = true;
                 sign.add(panel);
 
+                // Bidang papan putih dengan domain sebagai satu-satunya pesan utama.
                 const faceCanvas = document.createElement('canvas');
                 faceCanvas.width = 1200;
                 faceCanvas.height = 650;
                 const ctx = faceCanvas.getContext('2d');
 
-                const bg = ctx.createLinearGradient(0, 0, 1200, 650);
-                bg.addColorStop(0, '#092719');
-                bg.addColorStop(0.55, '#0e3a23');
-                bg.addColorStop(1, '#061d13');
-                ctx.fillStyle = bg;
-                ctx.fillRect(0, 0, 1200, 650);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, faceCanvas.width, faceCanvas.height);
 
-                // Bingkai tipis dan aksen sudut.
-                ctx.strokeStyle = 'rgba(218, 239, 218, 0.75)';
+                // Garis tepi hijau yang halus agar tetap selaras dengan identitas Iyalagi.Manjat.
+                ctx.strokeStyle = '#d7eadb';
                 ctx.lineWidth = 12;
-                ctx.strokeRect(22, 22, 1156, 606);
-                ctx.strokeStyle = 'rgba(141, 190, 145, 0.65)';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(42, 42, 1116, 566);
+                ctx.strokeRect(24, 24, 1152, 602);
 
-                // Logo wordmark bergaya handwritten, mempertahankan nama brand.
+                // Tulisan domain dibuat besar, kontras, dan mudah dibaca dari area pengunjung.
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.shadowColor = 'rgba(0,0,0,0.28)';
-                ctx.shadowBlur = 18;
-                ctx.fillStyle = '#a8e6ad';
-                ctx.font = 'italic 700 112px "Trebuchet MS", cursive';
-                ctx.fillText('iyalagi.manjat', 600, 292, 1050);
-                ctx.shadowBlur = 0;
-
-                ctx.fillStyle = '#e7f5e8';
-                ctx.font = '600 34px Arial, sans-serif';
-                ctx.letterSpacing = '12px';
-                ctx.fillText('CLIMBING COMMUNITY', 600, 430);
-
-                // Siluet kucing melompat sebagai aksen maskot.
-                ctx.save();
-                ctx.translate(600, 520);
-                ctx.strokeStyle = '#d9f2dc';
-                ctx.fillStyle = '#d9f2dc';
-                ctx.lineWidth = 15;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(-130, 28);
-                ctx.quadraticCurveTo(-215, -52, -170, -104);
-                ctx.quadraticCurveTo(-130, -150, -95, -104);
-                ctx.quadraticCurveTo(-25, -35, 45, -55);
-                ctx.quadraticCurveTo(105, -75, 155, -145);
-                ctx.quadraticCurveTo(172, -165, 188, -145);
-                ctx.quadraticCurveTo(205, -120, 170, -80);
-                ctx.quadraticCurveTo(110, 8, 35, 5);
-                ctx.quadraticCurveTo(-40, 18, -85, 60);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(160, -158, 34, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
+                ctx.fillStyle = '#123d24';
+                ctx.font = '700 104px Arial, sans-serif';
+                ctx.fillText('iyalagimanjat.com', 600, 325, 1080);
 
                 const logoTexture = new deps.THREE.CanvasTexture(faceCanvas);
                 logoTexture.encoding = deps.THREE.sRGBEncoding;
